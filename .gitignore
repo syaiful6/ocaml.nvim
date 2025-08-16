@@ -1,0 +1,7 @@
+result
+result-*
+.DS_Store
+.direnv
+.luarc.json
+.repro
+.pre-commit-config.yaml
