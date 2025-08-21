@@ -1,0 +1,35 @@
+return {
+  default = {
+    verbose = true,
+    coverage = false,
+    ROOT = { "." },
+    pattern = ".*_spec%.lua$",
+
+    -- Test paths
+    tests = { "tests" },
+
+    -- Module paths
+    lpath = "lua/?.lua;lua/?/init.lua;./?/init.lua;./?.lua",
+
+    -- Helper setup
+    -- helper = "tests/helpers/init.lua",
+
+    -- Output format
+    output = "utfTerminal",
+
+    -- Randomize test order
+    shuffle = true,
+
+    -- Run tests matching this pattern
+    -- filter = "",
+
+    -- Exclude tests matching this pattern
+    -- filter-out = "",
+
+    -- Stop on first failure
+    -- quit-on-failure = true,
+  },
+  tests = {
+    verbose = true,
+  },
+}
