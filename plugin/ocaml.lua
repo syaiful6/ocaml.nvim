@@ -1,5 +1,5 @@
 vim.filetype.add({
-  extensions = {
+  extension = {
     mli = "ocaml.interface",
     mly = "ocaml.menhir",
     mll = "ocaml.ocamllex",

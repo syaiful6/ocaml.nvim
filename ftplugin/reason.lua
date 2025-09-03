@@ -6,4 +6,4 @@ end
 require("ocaml.internal").ftplugin()
 
 --- Since user open reason file, we can go ahead and install Treesitter reason for them
-vim.cmd.OCamlTS("instal_reason")
+vim.cmd.OCamlTS("install_reason")
