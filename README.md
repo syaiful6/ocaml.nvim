@@ -52,7 +52,6 @@ detection, LSP integration, and comprehensive filetype support.
   dependencies = {
     "nvim-treesitter/nvim-treesitter",
   },
-  ft = { "ocaml", "reason", "ocaml.mlx", "ocaml.cram" },
 }
 ```
 
@@ -62,7 +61,6 @@ detection, LSP integration, and comprehensive filetype support.
 use {
   "ocaml/ocaml.nvim",
   requires = { "nvim-treesitter/nvim-treesitter" },
-  ft = { "ocaml", "reason", "ocaml.mlx", "ocaml.cram" },
 }
 ```
 
