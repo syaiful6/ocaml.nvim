@@ -7,7 +7,7 @@ local M = {}
 local function start_or_attach()
   local Types = require("ocaml.types.internal")
   if Types.evaluate(OcamlConfig.lsp.auto_attach) then
-    ---TODO: start the LSP
+    require("ocaml.lsp").start()
   end
 end
 

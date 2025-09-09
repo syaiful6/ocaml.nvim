@@ -1,0 +1,43 @@
+describe("ocaml.lsp", function()
+  local lsp = require("ocaml.lsp")
+  local lsp_helpers = require("ocaml.lsp.helpers")
+  local sandbox = require("ocaml.sandbox")
+
+  describe("helpers", function()
+    it("has correct client name", function()
+      assert.equal("ocamllsp", lsp_helpers.ocaml_client_name)
+    end)
+
+    it("can get LSP command", function()
+      local cmd = lsp_helpers.get_lsp_cmd("/tmp")
+      assert.is_table(cmd)
+      assert.equal("ocamllsp", cmd[1])
+    end)
+  end)
+
+  describe("sandbox integration", function()
+    it("detects sandbox commands correctly", function()
+      local cmd = sandbox.get_lsp_command("/tmp", {})
+      assert.is_table(cmd)
+      assert.equal("ocamllsp", cmd[1])
+    end)
+  end)
+
+  describe("functions exist", function()
+    it("has start function", function()
+      assert.is_function(lsp.start)
+    end)
+
+    it("has stop function", function()
+      assert.is_function(lsp.stop)
+    end)
+
+    it("has restart function", function()
+      assert.is_function(lsp.restart)
+    end)
+
+    it("has get_status function", function()
+      assert.is_function(lsp.get_status)
+    end)
+  end)
+end)
