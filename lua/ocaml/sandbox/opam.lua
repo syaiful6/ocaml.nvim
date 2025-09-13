@@ -40,11 +40,6 @@ local function get_opam_command_util(sandbox, args)
   return cmd
 end
 
----@class ocaml.sandbox.opam.Switch
----@field name string The switch name
----@field is_current boolean Whether this is the current switch
----@field is_local boolean Whether this is a local switch
-
 ---@class ocaml.sandbox.opam.Version
 ---@field major number The major version number
 ---@field minor number The minor version number
@@ -178,7 +173,7 @@ end
 
 --- Get opam variables using opam var command
 --- @param opam_binary string|nil The opam binary path (defaults to "opam")
---- @return ocaml.sandbox.opam.Variables|nil Variables, or nil on error
+--- @return ocaml.sandbox.opam.Variables|nil Variables or nil on error
 --- @return string|nil error The error message if any
 function M.get_variables(opam_binary)
   local version, err = M.get_version(opam_binary)
@@ -201,7 +196,7 @@ function M.get_variables(opam_binary)
 end
 
 --- Get the local switch for a directory, if any
---- @param sandbox|nil ocaml.sandbox.opam.Sandbox The opam sandbox
+--- @param sandbox ocaml.sandbox.opam.Sandbox|nil The opam sandbox
 --- @param dir string The directory to check
 --- @return string|nil The local switch name, or nil if none found
 function M.get_local_switch(sandbox, dir)
