@@ -120,8 +120,8 @@ LSP server:
 
 - **Esy Projects**: Detects `esy.json` or `package.json` with `esy` field →
   uses `esy -P ocamllsp`
-- **Opam Projects**: Detects `*.opam` files → uses `ocamllsp`
-  (future: opam exec)
+- **Opam Projects**: Detects `*.opam` files → uses local opam sandbox if present,
+  otherwise falls back to global `ocamllsp`
 - **Dune Projects**: Detects `dune-project`/`dune-workspace` → uses `ocamllsp`
 - **Global**: Falls back to global `ocamllsp`
 

@@ -9,11 +9,17 @@
 ---@class ocaml.Sandbox
 local M = {}
 local Esy = require("ocaml.sandbox.esy")
+local Opam = require("ocaml.sandbox.opam")
 
 -- Detect if the given directory is an esy sandbox.
 -- @param dir string The directory to check
 -- @return boolean True if the directory is an esy sandbox, false otherwise
 local function is_esy_sandbox(dir)
+  -- first check if esy command is available
+  if vim.fn.executable("esy") == 0 then
+    return false
+  end
+
   local manifest = Esy.get_project_manifest(dir)
   if not manifest then
     return false
@@ -32,8 +38,7 @@ local function is_esy_sandbox(dir)
 end
 
 -- Get the lsp command for the given directory.
--- If the directory is an esy sandbox, return the esy command.
--- Otherwise, return the default command.
+-- Priority: esy sandbox > opam local switch > global command
 -- @param dir string The directory to check
 -- @param args string[] Additional arguments to pass to the lsp command
 -- @return string[] The lsp command
@@ -41,10 +46,23 @@ function M.get_lsp_command(dir, args)
   local cmd = { "ocamllsp" }
   -- insert additional args
   vim.list_extend(cmd, args or {})
+
+  -- Check esy first (higher priority)
   if is_esy_sandbox(dir) then
     return Esy.get_command(Esy.get_project_manifest(dir), cmd)
   end
-  -- not a sandbox, return the command as is
+
+  -- Check opam local switch
+  if vim.fn.executable("opam") == 1 then
+    local sandbox, _ = Opam.create_sandbox()
+    local switch = Opam.get_local_switch(sandbox, dir)
+    if switch then
+      local opam_cmd = Opam.get_command(sandbox, switch, cmd)
+      return opam_cmd
+    end
+  end
+
+  -- Fallback to global command
   return cmd
 end
 
