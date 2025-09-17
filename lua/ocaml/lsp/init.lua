@@ -119,39 +119,4 @@ M.get_status = function(bufnr)
   return #clients > 0
 end
 
----@enum ocaml.lsp.Cmd
-local Cmd = {
-  start = "start",
-  stop = "stop",
-  restart = "restart",
-}
-
-local function ocaml_lsp_user_cmd(opts)
-  local fargs = opts.fargs
-  local cmd = table.remove(fargs, 1)
-  ---@cast cmd ocaml.lsp.Cmd
-  if cmd == Cmd.start then
-    M.start()
-  elseif cmd == Cmd.stop then
-    M.stop()
-  elseif cmd == Cmd.restart then
-    M.restart()
-  end
-end
-
-vim.api.nvim_create_user_command("OcamlLsp", ocaml_lsp_user_cmd, {
-  nargs = "+",
-  desc = "Start, stops the OCaml LSP client",
-  complete = function(arg_lead, cmdline, _)
-    local clients = lsp_helpers.get_active_lsp_clients()
-    ---@type ocaml.lsp.Cmd[]
-    local commands = #clients == 0 and { "start" } or { "stop", "restart" }
-    if cmdline:match("^OcamlLsp%s+%w*$") then
-      return vim.tbl_filter(function(command)
-        return command:find(arg_lead) ~= nil
-      end, commands)
-    end
-  end,
-})
-
 return M
