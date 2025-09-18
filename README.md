@@ -125,12 +125,25 @@ LSP server:
 - **Dune Projects**: Detects `dune-project`/`dune-workspace` → uses `ocamllsp`
 - **Global**: Falls back to global `ocamllsp`
 
-### Manual LSP Control
+### Commands
+
+All plugin commands are available as subcommands under `:OCaml`:
+
+#### LSP Control
 
 ```vim
-:OcamlLsp start    " Start LSP server
-:OcamlLsp stop     " Stop LSP server  
-:OcamlLsp restart  " Restart LSP server
+
+:OCaml lsp start    " Start LSP server
+:OCaml lsp stop     " Stop LSP server
+:OCaml lsp restart  " Restart LSP server
+```
+
+#### TreeSitter Support
+
+```vim
+
+:OCaml ts install_reason  " Install Reason TreeSitter parser
+:OCaml ts install_mlx     " Install MLX TreeSitter parser
 ```
 
 ### Code Formatting

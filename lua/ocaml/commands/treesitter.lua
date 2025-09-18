@@ -18,7 +18,7 @@ local function get_parser_config()
 end
 
 --- Install Reason Treesitter
-local install_reason = function()
+function M.install_reason()
   if not pcall(require, "nvim-treesitter") then
     vim.notify("[ocaml.nvim] nvim-treesitter is required for Treesitter support", vim.log.levels.ERROR)
     return false
@@ -34,12 +34,11 @@ local install_reason = function()
       branch = "master",
     },
   }
-
   local install = require("nvim-treesitter.install")
   install.ensure_installed("reason")
 end
 
-local install_mlx = function()
+function M.install_mlx()
   if not pcall(require, "nvim-treesitter") then
     vim.notify("[ocaml.nvim] nvim-treesitter is required for Treesitter support", vim.log.levels.ERROR)
     return false
@@ -61,37 +60,6 @@ local install_mlx = function()
 
   local install = require("nvim-treesitter.install")
   install.ensure_installed("ocaml_mlx")
-end
-
----@enum ocaml.commands.treesitter.Cmd
-local Cmd = {
-  install_reason = "install_reason",
-  install_mlx = "install_mlx",
-}
-
-local function ocaml_treesitter_user_cmd(opts)
-  local fargs = opts.fargs
-  local cmd = table.remove(fargs, 1)
-  if cmd == Cmd.install_reason then
-    install_reason()
-  elseif cmd == Cmd.install_mlx then
-    install_mlx()
-  end
-end
-
----Setup Treesitter commands
-function M.setup()
-  vim.api.nvim_create_user_command("OCamlTS", ocaml_treesitter_user_cmd, {
-    nargs = "+",
-    desc = "Install Reason and Mlx etc",
-    complete = function(arg_lead, cmdline, _)
-      if cmdline:match("^OCamlTS%s+%w*$") then
-        return vim.tbl_filter(function(command)
-          return command:find(arg_lead) ~= nil
-        end, Cmd)
-      end
-    end,
-  })
 end
 
 return M
