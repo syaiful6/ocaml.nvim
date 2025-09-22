@@ -34,8 +34,6 @@ function M.install_reason()
       branch = "master",
     },
   }
-  local install = require("nvim-treesitter.install")
-  install.ensure_installed("reason")
 end
 
 function M.install_mlx()
@@ -57,9 +55,6 @@ function M.install_mlx()
     },
     filetype = "ocaml_mlx",
   }
-
-  local install = require("nvim-treesitter.install")
-  install.ensure_installed("ocaml_mlx")
 end
 
 return M
