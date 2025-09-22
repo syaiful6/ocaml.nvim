@@ -66,4 +66,29 @@ function M.get_lsp_command(dir, args)
   return cmd
 end
 
+-- Get the sandboxed command for any OCaml tool in the given directory.
+-- Priority: esy sandbox > opam local switch > global command
+-- @param dir string The directory to check
+-- @param cmd string[] The command to run (e.g., {"dune", "build", "--watch"})
+-- @return string[] The sandboxed command
+function M.get_command(dir, cmd)
+  -- Check esy first (higher priority)
+  if is_esy_sandbox(dir) then
+    return Esy.get_command(Esy.get_project_manifest(dir), cmd)
+  end
+
+  -- Check opam local switch
+  if vim.fn.executable("opam") == 1 then
+    local sandbox, _ = Opam.create_sandbox()
+    local switch = Opam.get_local_switch(sandbox, dir)
+    if switch then
+      local opam_cmd = Opam.get_command(sandbox, switch, cmd)
+      return opam_cmd
+    end
+  end
+
+  -- Fallback to global command
+  return cmd
+end
+
 return M
