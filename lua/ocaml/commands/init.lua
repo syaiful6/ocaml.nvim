@@ -5,6 +5,7 @@
 
 local TS = require("ocaml.commands.treesitter")
 local LSP = require("ocaml.lsp")
+local Dune = require("ocaml.commands.dune")
 
 local M = {}
 
@@ -97,6 +98,27 @@ local lsp_subcmd_tbl = {
 }
 
 register_subcommand_tbl("lsp", lsp_subcmd_tbl)
+
+---@type table<string, ocaml.commands.Subcommand>
+local dune_subcmd_tbl = {
+  ["build-watch"] = {
+    impl = function()
+      Dune.start_watch()
+    end,
+  },
+  ["build-watch-stop"] = {
+    impl = function()
+      Dune.stop_watch()
+    end,
+  },
+  ["build-watch-status"] = {
+    impl = function()
+      Dune.status()
+    end,
+  },
+}
+
+register_subcommand_tbl("dune", dune_subcmd_tbl)
 
 ---@generic K,V
 ---@param predicate fun(V): boolean
