@@ -3,7 +3,6 @@
 ---User commands for OCaml development
 ---]]
 
-local TS = require("ocaml.commands.treesitter")
 local LSP = require("ocaml.lsp")
 local Dune = require("ocaml.commands.dune")
 
@@ -61,22 +60,6 @@ Available subcommands:
     end,
   }
 end
-
----@type table<string, ocaml.commands.Subcommand>
-local treesitter_subcmd_tbl = {
-  install_reason = {
-    impl = function()
-      TS.install_reason()
-    end,
-  },
-  install_mlx = {
-    impl = function()
-      TS.install_mlx()
-    end,
-  },
-}
-
-register_subcommand_tbl("ts", treesitter_subcmd_tbl)
 
 ---@type table<string, ocaml.commands.Subcommand>
 local lsp_subcmd_tbl = {

@@ -6,6 +6,7 @@ local M = {}
 
 local function start_or_attach()
   local Types = require("ocaml.types.internal")
+
   if Types.evaluate(OcamlConfig.lsp.auto_attach) then
     require("ocaml.lsp").start()
   end
@@ -31,6 +32,10 @@ local function init()
   vim.g.ocamlnvim_loaded = true
 
   setup_formatter()
+
+  local ts = require("ocaml.treesitter")
+  ts.install_reason()
+  ts.install_mlx()
 
   --- Setup OCaml commands
   require("ocaml.commands").setup()
