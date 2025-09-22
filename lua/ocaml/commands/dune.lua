@@ -26,7 +26,7 @@ function M.start_watch()
   dune_job_id = vim.fn.jobstart(sandboxed_cmd, {
     cwd = project_root,
     on_stdout = function(_, data)
-      if data and #data > 1 then
+      if data and #data > 0 and data[1] ~= "" then
         for _, line in ipairs(data) do
           if line ~= "" then
             vim.notify("[dune] " .. line, vim.log.levels.INFO)
@@ -35,7 +35,7 @@ function M.start_watch()
       end
     end,
     on_stderr = function(_, data)
-      if data and #data > 1 then
+      if data and #data > 0 and data[1] ~= "" then
         for _, line in ipairs(data) do
           if line ~= "" then
             vim.notify("[dune] " .. line, vim.log.levels.ERROR)
