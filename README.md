@@ -86,6 +86,27 @@ require("lspconfig").ocamllsp.setup({
 -- ✅ OR better yet, don't configure it at all in lspconfig
 ```
 
+### LazyVim Users
+
+If you're using [LazyVim](https://github.com/LazyVim/LazyVim), completely disable
+the `ocamllsp` server in your LSP configuration to prevent conflicts:
+
+```lua
+{
+  "neovim/nvim-lspconfig",
+  opts = {
+    servers = {
+      -- Completely disable ocamllsp to prevent conflicts
+      ocamllsp = false,
+    },
+  },
+}
+```
+
+**Why this is important**: Even with `autostart = false`, incomplete LSP configurations
+can cause errors when Neovim tries to resolve LSP commands. Setting the server to
+`false` completely removes it from the global LSP configuration.
+
 This plugin provides intelligent sandbox detection (esy, opam, global) and will
 automatically start the appropriate LSP server with the correct configuration.
 
@@ -99,7 +120,7 @@ vim.g.ocamlnvim = {
   lsp = {
     -- Enable/disable automatic LSP attachment
     auto_attach = true,
-    
+
     -- Custom on_attach function
     on_attach = function(client_id, bufnr)
       -- Set up keymaps, autocommands, etc.
@@ -107,9 +128,48 @@ vim.g.ocamlnvim = {
       vim.keymap.set('n', 'K', vim.lsp.buf.hover, { buffer = bufnr })
       -- ... more LSP keymaps
     end,
+
+    -- OCaml LSP server settings
+    settings = {
+      duneDiagnostics = true,      -- Dune-specific diagnostics
+      syntaxDocumentation = true,  -- Syntax documentation
+    },
+
+    -- Experimental OCaml LSP features
+    experimental = {
+      switchImplIntf = true,       -- Switch between .ml/.mli files
+      inferIntf = true,            -- Interface inference
+      typedHoles = true,           -- Typed holes support
+      typeEnclosing = true,        -- Type enclosing
+      construct = true,            -- Construct handling
+      destruct = true,             -- Destruct handling
+      jumpToNextHole = true,       -- Jump to next hole
+    },
   },
 }
 ```
+
+### Advanced LSP Features
+
+This plugin supports all the advanced features from the VSCode OCaml Platform:
+
+#### Core Settings
+
+- **Dune Diagnostics**: Build system integration for better error reporting
+- **Syntax Documentation**: Documentation extraction from comments
+
+#### Experimental Features
+
+- **Switch Implementation/Interface**: Quick navigation between `.ml` and `.mli`
+  files
+- **Interface Inference**: Automatic interface generation from implementation
+- **Typed Holes**: Support for `_` placeholders with type information
+- **Type Enclosing**: Show types of expressions under cursor
+- **Construct/Destruct**: Advanced code manipulation features
+- **Jump to Next Hole**: Navigate between typed holes in your code
+
+All features are disabled by default but can be enabled individually through
+configuration.
 
 ## 🚀 Usage
 
@@ -132,11 +192,28 @@ All plugin commands are available as subcommands under `:OCaml`:
 #### LSP Control
 
 ```vim
-
-:OCaml lsp start    " Start LSP server
-:OCaml lsp stop     " Stop LSP server
-:OCaml lsp restart  " Restart LSP server
+:OCaml lsp start     " Start LSP server
+:OCaml lsp stop      " Stop LSP server
+:OCaml lsp restart   " Restart LSP server
 ```
+
+#### Dune Integration
+
+```vim
+:OCaml dune build-watch        " Start dune build in watch mode
+:OCaml dune build-watch-stop   " Stop dune build watch
+:OCaml dune build-watch-status " Check dune watch status
+:OCaml dune promote            " Promote current file changes
+```
+
+**Dune Promote** applies file promotions for the current file. This is useful when:
+
+- Updating test expectations (cram tests, expect tests)
+- Promoting generated files to source tree
+- Accepting diff-based changes from build rules
+
+The command requires the file to be saved and uses LSP code actions to trigger
+the promotion.
 
 #### TreeSitter Support
 
@@ -161,13 +238,47 @@ The plugin searches for these files to determine project root and type:
 ```text
 📁 Project Root Detection (in order of precedence):
 ├── dune-project       # Dune project
-├── dune-workspace     # Dune workspace  
+├── dune-workspace     # Dune workspace
 ├── package.json       # Esy project (with esy field)
 ├── esy.json           # Esy project
 ├── *.opam             # Opam package
 ├── _build/            # Build directory
 └── .git/              # Git repository
 ```
+
+## 🔍 Troubleshooting
+
+### LSP Server Fails to Start
+
+If you see errors like `"cannot start ocamllsp due to config error"` in your
+LSP logs:
+
+1. **Check for conflicts**: Make sure you've disabled `ocamllsp` in your LSP
+   configuration
+2. **LazyVim users**: Set `ocamllsp = false` in your server configuration
+3. **Check LSP logs**: `:lua print(vim.fn.stdpath("log") .. "/lsp.log")` to
+   find the log file
+4. **Debug configuration**: Run `:lua print(vim.inspect(vim.lsp.config))` to
+   check for incomplete configurations
+
+### Command Not Found Errors
+
+If the plugin can't find `ocamllsp` or other tools:
+
+1. **Esy projects**: Ensure dependencies are installed with `esy install`
+2. **Opam projects**: Make sure you're in the correct opam switch with tools
+   installed
+3. **Global installation**: Install `ocamllsp` globally via opam or your
+   package manager
+
+### Sandbox Detection Issues
+
+If the plugin doesn't detect your project type correctly:
+
+1. **Check project markers**: Ensure you have the appropriate files
+   (`dune-project`, `package.json`, etc.)
+2. **Manual LSP control**: Use `:OCaml lsp restart` to force re-detection
+3. **Debug sandbox**: Check what command is being used by looking at LSP logs
 
 ## 🔧 Development
 

@@ -16,6 +16,21 @@ local OcamlDefaultConfig = {
     auto_attach = true,
     ---@type (fun(client:number,bufnr:number))
     on_attach = function(_, _) end,
+    ---@type ocaml.lsp.Settings
+    settings = {
+      duneDiagnostics = true,
+      syntaxDocumentation = true,
+    },
+    ---@type ocaml.lsp.Experimental
+    experimental = {
+      switchImplIntf = false,
+      inferIntf = false,
+      typedHoles = false,
+      typeEnclosing = false,
+      construct = false,
+      destruct = false,
+      jumpToNextHole = false,
+    },
   },
 }
 
