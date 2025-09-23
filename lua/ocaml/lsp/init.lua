@@ -9,6 +9,107 @@ local helpers = require("ocaml.helpers")
 
 local M = {}
 
+---Configure LSP settings for OCaml LSP server
+---@param lsp_config ocaml.lsp.StartConfig
+---@return table
+local function configure_settings(lsp_config)
+  local ocaml_settings = lsp_config.settings or {}
+  return {
+    ocamllsp = ocaml_settings,
+  }
+end
+
+---Configure LSP client capabilities including experimental features
+---@param lsp_config ocaml.lsp.StartConfig
+---@return lsp.ClientCapabilities
+local function configure_capabilities(lsp_config)
+  local experimental = lsp_config.experimental or {}
+  local capabilities = vim.lsp.protocol.make_client_capabilities()
+
+  -- Configure experimental capabilities
+  if experimental.jumpToNextHole then
+    capabilities.experimental = capabilities.experimental or {}
+    capabilities.experimental.jumpToNextHole = true
+  end
+
+  -- Add experimental capabilities for OCaml LSP features
+  if experimental.switchImplIntf then
+    capabilities.experimental = capabilities.experimental or {}
+    capabilities.experimental["ocamllsp/switchImplIntf"] = true
+  end
+
+  if experimental.inferIntf then
+    capabilities.experimental = capabilities.experimental or {}
+    capabilities.experimental["ocamllsp/inferIntf"] = true
+  end
+
+  if experimental.typedHoles then
+    capabilities.experimental = capabilities.experimental or {}
+    capabilities.experimental["ocamllsp/typedHoles"] = true
+  end
+
+  if experimental.typeEnclosing then
+    capabilities.experimental = capabilities.experimental or {}
+    capabilities.experimental["ocamllsp/typeEnclosing"] = true
+  end
+
+  if experimental.construct then
+    capabilities.experimental = capabilities.experimental or {}
+    capabilities.experimental["ocamllsp/construct"] = true
+  end
+
+  if experimental.destruct then
+    capabilities.experimental = capabilities.experimental or {}
+    capabilities.experimental["ocamllsp/destruct"] = true
+  end
+
+  return vim.tbl_deep_extend("force", capabilities, lsp_config.capabilities or {})
+end
+
+---Configure supported filetypes and language ID mapping
+---@param lsp_config ocaml.lsp.StartConfig
+---@return table
+local function configure_filetypes(lsp_config)
+  local filetypes = vim.deepcopy(lsp_config.filetypes or {})
+
+  local ensure_filetypes = {
+    "ocaml",
+    "ocaml.interface",
+    "ocaml.menhir",
+    "ocaml.ocamllex",
+    "reason",
+    "ocaml.mlx",
+    "ocaml.cram",
+  }
+
+  for _, ft in ipairs(ensure_filetypes) do
+    if not vim.tbl_contains(filetypes, ft) then
+      table.insert(filetypes, ft)
+    end
+  end
+
+  local original_get_language_id = lsp_config.get_language_id
+  local get_language_id = function(buf, filetype)
+    if filetype == "ocaml.interface" then
+      return "ocaml"
+    elseif filetype == "ocaml.menhir" then
+      return "menhir"
+    elseif filetype == "ocaml.ocamllex" then
+      return "ocamllex"
+    elseif filetype == "reason" then
+      return "reason"
+    elseif filetype == "ocaml.mlx" then
+      return "mlx"
+    elseif filetype == "ocaml.cram" then
+      return "cram"
+    else
+      return original_get_language_id and original_get_language_id(buf, filetype) or filetype
+    end
+  end
+
+  return filetypes, get_language_id
+end
+
 ---@class ocaml.lsp.StartConfig: ocaml.lsp.ClientConfig
 ---@field root_dir string | nil
 ---@field cmd string[]
@@ -54,13 +155,17 @@ No project root found.
   -- Normalize paths for consistent comparison
   local normalized_cwd = vim.fs.normalize(root_dir)
   lsp_start_config.root_dir = normalized_cwd
-  lsp_start_config.settings = type(lsp_start_config.settings) == "function"
-      and lsp_start_config.settings(normalized_cwd)
-    or lsp_start_config.settings
-  -- Clone the command array to avoid reference issues with global LSP configurations
-  local lsp_cmd = lsp_helpers.get_lsp_cmd(normalized_cwd)
 
-  -- Validate the command before proceeding
+  -- Configure LSP components using extracted functions
+  lsp_start_config.settings = configure_settings(lsp_start_config)
+  lsp_start_config.capabilities = configure_capabilities(lsp_start_config)
+
+  local filetypes, get_language_id = configure_filetypes(lsp_start_config)
+  lsp_start_config.filetypes = filetypes
+  lsp_start_config.get_language_id = get_language_id
+
+  -- Get and validate LSP command
+  local lsp_cmd = lsp_helpers.get_lsp_cmd(normalized_cwd)
   if not lsp_cmd or type(lsp_cmd) ~= "table" or #lsp_cmd == 0 then
     vim.notify("[ocaml.nvim] Invalid LSP command: " .. vim.inspect(lsp_cmd), vim.log.levels.ERROR)
     return
@@ -77,46 +182,7 @@ No project root found.
   lsp_start_config.cmd = vim.deepcopy(lsp_cmd)
   lsp_start_config.name = lsp_helpers.ocaml_client_name
 
-  local filetypes = vim.deepcopy(lsp_start_config.filetypes or {})
-
-  local ensure_filetypes = {
-    "ocaml",
-    "ocaml.interface",
-    "ocaml.menhir",
-    "ocaml.ocamllex",
-    "reason",
-    "ocaml.mlx",
-    "ocaml.cram",
-  }
-
-  for _, ft in ipairs(ensure_filetypes) do
-    if not vim.tbl_contains(filetypes, ft) then
-      table.insert(filetypes, ft)
-    end
-  end
-
-  lsp_start_config.filetypes = filetypes
-
-  local original_get_language_id = lsp_start_config.get_language_id
-  lsp_start_config.get_language_id = function(buf, filetype)
-    if filetype == "ocaml.interface" then
-      return "ocaml"
-    elseif filetype == "ocaml.menhir" then
-      return "menhir"
-    elseif filetype == "ocaml.ocamllex" then
-      return "ocamllex"
-    elseif filetype == "reason" then
-      return "reason"
-    elseif filetype == "ocaml.mlx" then
-      return "mlx"
-    elseif filetype == "ocaml.cram" then
-      return "cram"
-    else
-      return original_get_language_id and original_get_language_id(buf, filetype) or filetype
-    end
-  end
-
-  -- Check if client is already running
+  -- Check if client is already running for this project
   local clients = lsp_helpers.get_active_lsp_clients()
   for _, client in ipairs(clients) do
     local client_root_dir = vim.fs.normalize(client.config.root_dir or "")

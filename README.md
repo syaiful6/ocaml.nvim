@@ -120,7 +120,7 @@ vim.g.ocamlnvim = {
   lsp = {
     -- Enable/disable automatic LSP attachment
     auto_attach = true,
-    
+
     -- Custom on_attach function
     on_attach = function(client_id, bufnr)
       -- Set up keymaps, autocommands, etc.
@@ -128,9 +128,48 @@ vim.g.ocamlnvim = {
       vim.keymap.set('n', 'K', vim.lsp.buf.hover, { buffer = bufnr })
       -- ... more LSP keymaps
     end,
+
+    -- OCaml LSP server settings
+    settings = {
+      duneDiagnostics = true,      -- Dune-specific diagnostics
+      syntaxDocumentation = true,  -- Syntax documentation
+    },
+
+    -- Experimental OCaml LSP features
+    experimental = {
+      switchImplIntf = true,       -- Switch between .ml/.mli files
+      inferIntf = true,            -- Interface inference
+      typedHoles = true,           -- Typed holes support
+      typeEnclosing = true,        -- Type enclosing
+      construct = true,            -- Construct handling
+      destruct = true,             -- Destruct handling
+      jumpToNextHole = true,       -- Jump to next hole
+    },
   },
 }
 ```
+
+### Advanced LSP Features
+
+This plugin supports all the advanced features from the VSCode OCaml Platform:
+
+#### Core Settings
+
+- **Dune Diagnostics**: Build system integration for better error reporting
+- **Syntax Documentation**: Documentation extraction from comments
+
+#### Experimental Features
+
+- **Switch Implementation/Interface**: Quick navigation between `.ml` and `.mli`
+  files
+- **Interface Inference**: Automatic interface generation from implementation
+- **Typed Holes**: Support for `_` placeholders with type information
+- **Type Enclosing**: Show types of expressions under cursor
+- **Construct/Destruct**: Advanced code manipulation features
+- **Jump to Next Hole**: Navigate between typed holes in your code
+
+All features are disabled by default but can be enabled individually through
+configuration.
 
 ## 🚀 Usage
 
@@ -153,11 +192,28 @@ All plugin commands are available as subcommands under `:OCaml`:
 #### LSP Control
 
 ```vim
-
-:OCaml lsp start    " Start LSP server
-:OCaml lsp stop     " Stop LSP server
-:OCaml lsp restart  " Restart LSP server
+:OCaml lsp start     " Start LSP server
+:OCaml lsp stop      " Stop LSP server
+:OCaml lsp restart   " Restart LSP server
 ```
+
+#### Dune Integration
+
+```vim
+:OCaml dune build-watch        " Start dune build in watch mode
+:OCaml dune build-watch-stop   " Stop dune build watch
+:OCaml dune build-watch-status " Check dune watch status
+:OCaml dune promote            " Promote current file changes
+```
+
+**Dune Promote** applies file promotions for the current file. This is useful when:
+
+- Updating test expectations (cram tests, expect tests)
+- Promoting generated files to source tree
+- Accepting diff-based changes from build rules
+
+The command requires the file to be saved and uses LSP code actions to trigger
+the promotion.
 
 #### TreeSitter Support
 

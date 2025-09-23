@@ -99,6 +99,11 @@ local dune_subcmd_tbl = {
       Dune.status()
     end,
   },
+  promote = {
+    impl = function()
+      Dune.promote_file()
+    end,
+  },
 }
 
 register_subcommand_tbl("dune", dune_subcmd_tbl)
