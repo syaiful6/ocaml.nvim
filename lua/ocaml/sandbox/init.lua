@@ -49,7 +49,10 @@ function M.get_lsp_command(dir, args)
 
   -- Check esy first (higher priority)
   if is_esy_sandbox(dir) then
-    return Esy.get_command(Esy.get_project_manifest(dir), cmd)
+    local esy_cmd = Esy.get_command(Esy.get_project_manifest(dir), cmd)
+    if esy_cmd then
+      return esy_cmd
+    end
   end
 
   -- Check opam local switch
@@ -58,7 +61,9 @@ function M.get_lsp_command(dir, args)
     local switch = Opam.get_local_switch(sandbox, dir)
     if switch then
       local opam_cmd = Opam.get_command(sandbox, switch, cmd)
-      return opam_cmd
+      if opam_cmd then
+        return opam_cmd
+      end
     end
   end
 
@@ -74,7 +79,10 @@ end
 function M.get_command(dir, cmd)
   -- Check esy first (higher priority)
   if is_esy_sandbox(dir) then
-    return Esy.get_command(Esy.get_project_manifest(dir), cmd)
+    local esy_cmd = Esy.get_command(Esy.get_project_manifest(dir), cmd)
+    if esy_cmd then
+      return esy_cmd
+    end
   end
 
   -- Check opam local switch
@@ -83,7 +91,9 @@ function M.get_command(dir, cmd)
     local switch = Opam.get_local_switch(sandbox, dir)
     if switch then
       local opam_cmd = Opam.get_command(sandbox, switch, cmd)
-      return opam_cmd
+      if opam_cmd then
+        return opam_cmd
+      end
     end
   end
 

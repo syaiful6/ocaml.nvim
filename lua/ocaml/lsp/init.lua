@@ -57,9 +57,64 @@ No project root found.
   lsp_start_config.settings = type(lsp_start_config.settings) == "function"
       and lsp_start_config.settings(normalized_cwd)
     or lsp_start_config.settings
-  lsp_start_config.cmd = lsp_helpers.get_lsp_cmd(normalized_cwd)
+  -- Clone the command array to avoid reference issues with global LSP configurations
+  local lsp_cmd = lsp_helpers.get_lsp_cmd(normalized_cwd)
+
+  -- Validate the command before proceeding
+  if not lsp_cmd or type(lsp_cmd) ~= "table" or #lsp_cmd == 0 then
+    vim.notify("[ocaml.nvim] Invalid LSP command: " .. vim.inspect(lsp_cmd), vim.log.levels.ERROR)
+    return
+  end
+
+  -- Ensure all command arguments are strings
+  for i, arg in ipairs(lsp_cmd) do
+    if type(arg) ~= "string" then
+      vim.notify("[ocaml.nvim] Invalid LSP command argument at index " .. i .. ": " .. type(arg), vim.log.levels.ERROR)
+      return
+    end
+  end
+
+  lsp_start_config.cmd = vim.deepcopy(lsp_cmd)
   lsp_start_config.name = lsp_helpers.ocaml_client_name
-  lsp_start_config.filetypes = { "ocaml", "reason", "ocaml.mlx", "ocaml.cram" }
+
+  local filetypes = vim.deepcopy(lsp_start_config.filetypes or {})
+
+  local ensure_filetypes = {
+    "ocaml",
+    "ocaml.interface",
+    "ocaml.menhir",
+    "ocaml.ocamllex",
+    "reason",
+    "ocaml.mlx",
+    "ocaml.cram",
+  }
+
+  for _, ft in ipairs(ensure_filetypes) do
+    if not vim.tbl_contains(filetypes, ft) then
+      table.insert(filetypes, ft)
+    end
+  end
+
+  lsp_start_config.filetypes = filetypes
+
+  local original_get_language_id = lsp_start_config.get_language_id
+  lsp_start_config.get_language_id = function(buf, filetype)
+    if filetype == "ocaml.interface" then
+      return "ocaml"
+    elseif filetype == "ocaml.menhir" then
+      return "menhir"
+    elseif filetype == "ocaml.ocamllex" then
+      return "ocamllex"
+    elseif filetype == "reason" then
+      return "reason"
+    elseif filetype == "ocaml.mlx" then
+      return "mlx"
+    elseif filetype == "ocaml.cram" then
+      return "cram"
+    else
+      return original_get_language_id and original_get_language_id(buf, filetype) or filetype
+    end
+  end
 
   -- Check if client is already running
   local clients = lsp_helpers.get_active_lsp_clients()

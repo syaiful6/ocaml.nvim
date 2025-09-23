@@ -86,6 +86,27 @@ require("lspconfig").ocamllsp.setup({
 -- ✅ OR better yet, don't configure it at all in lspconfig
 ```
 
+### LazyVim Users
+
+If you're using [LazyVim](https://github.com/LazyVim/LazyVim), completely disable
+the `ocamllsp` server in your LSP configuration to prevent conflicts:
+
+```lua
+{
+  "neovim/nvim-lspconfig",
+  opts = {
+    servers = {
+      -- Completely disable ocamllsp to prevent conflicts
+      ocamllsp = false,
+    },
+  },
+}
+```
+
+**Why this is important**: Even with `autostart = false`, incomplete LSP configurations
+can cause errors when Neovim tries to resolve LSP commands. Setting the server to
+`false` completely removes it from the global LSP configuration.
+
 This plugin provides intelligent sandbox detection (esy, opam, global) and will
 automatically start the appropriate LSP server with the correct configuration.
 
@@ -161,13 +182,47 @@ The plugin searches for these files to determine project root and type:
 ```text
 📁 Project Root Detection (in order of precedence):
 ├── dune-project       # Dune project
-├── dune-workspace     # Dune workspace  
+├── dune-workspace     # Dune workspace
 ├── package.json       # Esy project (with esy field)
 ├── esy.json           # Esy project
 ├── *.opam             # Opam package
 ├── _build/            # Build directory
 └── .git/              # Git repository
 ```
+
+## 🔍 Troubleshooting
+
+### LSP Server Fails to Start
+
+If you see errors like `"cannot start ocamllsp due to config error"` in your
+LSP logs:
+
+1. **Check for conflicts**: Make sure you've disabled `ocamllsp` in your LSP
+   configuration
+2. **LazyVim users**: Set `ocamllsp = false` in your server configuration
+3. **Check LSP logs**: `:lua print(vim.fn.stdpath("log") .. "/lsp.log")` to
+   find the log file
+4. **Debug configuration**: Run `:lua print(vim.inspect(vim.lsp.config))` to
+   check for incomplete configurations
+
+### Command Not Found Errors
+
+If the plugin can't find `ocamllsp` or other tools:
+
+1. **Esy projects**: Ensure dependencies are installed with `esy install`
+2. **Opam projects**: Make sure you're in the correct opam switch with tools
+   installed
+3. **Global installation**: Install `ocamllsp` globally via opam or your
+   package manager
+
+### Sandbox Detection Issues
+
+If the plugin doesn't detect your project type correctly:
+
+1. **Check project markers**: Ensure you have the appropriate files
+   (`dune-project`, `package.json`, etc.)
+2. **Manual LSP control**: Use `:OCaml lsp restart` to force re-detection
+3. **Debug sandbox**: Check what command is being used by looking at LSP logs
 
 ## 🔧 Development
 
