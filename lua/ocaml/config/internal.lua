@@ -18,8 +18,12 @@ local OcamlDefaultConfig = {
     on_attach = function(_, _) end,
     ---@type ocaml.lsp.Settings
     settings = {
+      extendedHover = true,
+      codelens = true,
       duneDiagnostics = true,
+      inlayHints = true,
       syntaxDocumentation = true,
+      merlinJumpCodeActions = true,
     },
     ---@type ocaml.lsp.Experimental
     experimental = {

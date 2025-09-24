@@ -9,14 +9,20 @@ local helpers = require("ocaml.helpers")
 
 local M = {}
 
+---@class ocaml.lsp.ocamllsp.Enabled
+---@field enable boolean
+
 ---Configure LSP settings for OCaml LSP server
 ---@param lsp_config ocaml.lsp.StartConfig
----@return table
+---@return table<string, ocaml.lsp.ocamllsp.Enabled>
 local function configure_settings(lsp_config)
   local ocaml_settings = lsp_config.settings or {}
-  return {
-    ocamllsp = ocaml_settings,
-  }
+  for key, value in pairs(ocaml_settings) do
+    if type(value) == "boolean" then
+      ocaml_settings[key] = { enable = value }
+    end
+  end
+  return ocaml_settings
 end
 
 ---Configure LSP client capabilities including experimental features
@@ -80,6 +86,7 @@ local function configure_filetypes(lsp_config)
     "reason",
     "ocaml.mlx",
     "ocaml.cram",
+    "dune",
   }
 
   for _, ft in ipairs(ensure_filetypes) do
@@ -108,6 +115,21 @@ local function configure_filetypes(lsp_config)
   end
 
   return filetypes, get_language_id
+end
+
+--- Default on_attach function
+---@param client vim.lsp.Client The LSP client
+---@param bufnr number The buffer number
+local function default_on_attach(client, bufnr)
+  -- Enable completion with autotrigger
+  vim.lsp.completion.enable(true, client.id, bufnr, {
+    autotrigger = true,
+  })
+
+  -- Enable inlay hints if supported
+  if client.server_capabilities.inlayHintProvider then
+    vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
+  end
 end
 
 ---@class ocaml.lsp.StartConfig: ocaml.lsp.ClientConfig
@@ -193,17 +215,18 @@ No project root found.
     end
   end
 
+  local on_attach = lsp_start_config.on_attach
+  lsp_start_config.on_attach = function(client, buf)
+    default_on_attach(client, buf)
+    if on_attach and type(on_attach) == "function" then
+      on_attach(client, buf)
+    end
+  end
+
   -- Start new LSP client
   local client_id = vim.lsp.start(lsp_start_config, { bufnr = bufnr })
 
-  if client_id then
-    vim.lsp.buf_attach_client(bufnr, client_id)
-
-    -- Call on_attach if configured
-    if lsp_start_config.on_attach then
-      lsp_start_config.on_attach(client_id, bufnr)
-    end
-  else
+  if not client_id then
     vim.notify("[ocaml.nvim] Failed to start OCaml LSP server", vim.log.levels.ERROR)
   end
 end
