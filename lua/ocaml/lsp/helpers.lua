@@ -25,6 +25,24 @@ M.get_active_lsp_clients = function(bufnr, filter)
   return vim.lsp.get_clients(client_filter)
 end
 
+---@param bufnr? number the buffer to get clients for
+---@param method string LSP method name
+---@param params table|nil Parameters to send to the server
+---@param handler? lsp.Handler The handler to call when the response is received,
+---@return boolean client_found True if a client was found and the request was sent
+M.buf_request = function(bufnr, method, params, handler)
+  if bufnr == nil or bufnr == 0 then
+    bufnr = vim.api.nvim_get_current_buf()
+  end
+  local client_found = false
+  local clients = M.get_active_lsp_clients(bufnr, { method = method })
+  for _, client in ipairs(clients) do
+    client:request(method, params, handler, 0)
+    client_found = true
+  end
+  return client_found
+end
+
 --- Get OCaml LSP command using sandbox detection
 ---
 ---@param root_dir string The project root directory

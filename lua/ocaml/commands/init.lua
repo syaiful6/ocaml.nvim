@@ -5,6 +5,7 @@
 
 local LSP = require("ocaml.lsp")
 local Dune = require("ocaml.commands.dune")
+local Jump = require("ocaml.commands.jump")
 
 local M = {}
 
@@ -15,13 +16,35 @@ local M = {}
 ---
 ---Command completion callback, taking the lead of the subcommand's arguments
 ---Or a list of subcommand
----@field complete? string[] | fun(subcmd_arg_lead: string): string[]
+---@field complete? string[] | (fun(subcmd_arg_lead: string): string[])
 ---
 ---Whether the command supports a bang!
 ---@field bang? boolean
 
 ---@type table<string, ocaml.commands.Subcommand>
-local command_tbl = {}
+local command_tbl = {
+  jump = {
+    impl = function(args)
+      local direction = #args > 0 and args[1] or nil
+      Jump.merlin_jump(direction)
+    end,
+    complete = { "fun", "let", "module", "module-type", "match", "match-next-case", "match-prev-case" },
+  },
+  ["jump-hole"] = {
+    impl = function(args)
+      local direction = args[1]
+      Jump.jump_to_typed_hole(direction)
+    end,
+    complete = { "next", "prev" },
+  },
+  phrase = {
+    impl = function(args)
+      local direction = args[1]
+      Jump.phrase(direction)
+    end,
+    complete = { "next", "prev" },
+  },
+}
 
 ---@param name string The name of the subcommand
 ---@param subcmd_tbl table<string, ocaml.commands.Subcommand> The subcommand's subcommand table
@@ -148,6 +171,11 @@ function M.setup()
         or vim.tbl_keys(command_tbl)
       local subcmd, subcmd_arg_lead = cmdline:match("^['<,'>]*OCaml[!]*%s(%S+)%s(.*)$")
       if subcmd and subcmd_arg_lead and command_tbl[subcmd] and command_tbl[subcmd].complete then
+        if type(command_tbl[subcmd].complete) == "table" then
+          return vim.tbl_filter(function(c)
+            return c:find(subcmd_arg_lead) ~= nil
+          end, command_tbl[subcmd].complete)
+        end
         return command_tbl[subcmd].complete(subcmd_arg_lead)
       end
       if cmdline:match("^['<,'>]*OCaml[!]*%s+%w$") then

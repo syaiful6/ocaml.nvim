@@ -25,53 +25,6 @@ local function configure_settings(lsp_config)
   return ocaml_settings
 end
 
----Configure LSP client capabilities including experimental features
----@param lsp_config ocaml.lsp.StartConfig
----@return lsp.ClientCapabilities
-local function configure_capabilities(lsp_config)
-  local experimental = lsp_config.experimental or {}
-  local capabilities = vim.lsp.protocol.make_client_capabilities()
-
-  -- Configure experimental capabilities
-  if experimental.jumpToNextHole then
-    capabilities.experimental = capabilities.experimental or {}
-    capabilities.experimental.jumpToNextHole = true
-  end
-
-  -- Add experimental capabilities for OCaml LSP features
-  if experimental.switchImplIntf then
-    capabilities.experimental = capabilities.experimental or {}
-    capabilities.experimental["ocamllsp/switchImplIntf"] = true
-  end
-
-  if experimental.inferIntf then
-    capabilities.experimental = capabilities.experimental or {}
-    capabilities.experimental["ocamllsp/inferIntf"] = true
-  end
-
-  if experimental.typedHoles then
-    capabilities.experimental = capabilities.experimental or {}
-    capabilities.experimental["ocamllsp/typedHoles"] = true
-  end
-
-  if experimental.typeEnclosing then
-    capabilities.experimental = capabilities.experimental or {}
-    capabilities.experimental["ocamllsp/typeEnclosing"] = true
-  end
-
-  if experimental.construct then
-    capabilities.experimental = capabilities.experimental or {}
-    capabilities.experimental["ocamllsp/construct"] = true
-  end
-
-  if experimental.destruct then
-    capabilities.experimental = capabilities.experimental or {}
-    capabilities.experimental["ocamllsp/destruct"] = true
-  end
-
-  return vim.tbl_deep_extend("force", capabilities, lsp_config.capabilities or {})
-end
-
 ---Configure supported filetypes and language ID mapping
 ---@param lsp_config ocaml.lsp.StartConfig
 ---@return table
@@ -180,7 +133,6 @@ No project root found.
 
   -- Configure LSP components using extracted functions
   lsp_start_config.settings = configure_settings(lsp_start_config)
-  lsp_start_config.capabilities = configure_capabilities(lsp_start_config)
 
   local filetypes, get_language_id = configure_filetypes(lsp_start_config)
   lsp_start_config.filetypes = filetypes
