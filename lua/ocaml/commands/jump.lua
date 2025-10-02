@@ -107,12 +107,13 @@ function M.merlin_jump(target)
       return
     end
     local jumps = result.jumps --[[@as ocaml.commands.Jump[] ]]
-    --- If there are only one jump, go there directly
+
     if #jumps == 0 then
       vim.notify("[ocaml.nvim] No jump target found", vim.log.levels.INFO)
       return
     end
 
+    --- If there are only one jump, go there directly
     if #jumps == 1 then
       local jump = jumps[1]
       local pos = jump.position

@@ -3,10 +3,6 @@
 ---User commands for OCaml development
 ---]]
 
-local LSP = require("ocaml.lsp")
-local Dune = require("ocaml.commands.dune")
-local Jump = require("ocaml.commands.jump")
-
 local M = {}
 
 ---@class ocaml.commands.Subcommand
@@ -26,23 +22,28 @@ local command_tbl = {
   jump = {
     impl = function(args)
       local direction = #args > 0 and args[1] or nil
-      Jump.merlin_jump(direction)
+      require("ocaml.commands.jump").merlin_jump(direction)
     end,
     complete = { "fun", "let", "module", "module-type", "match", "match-next-case", "match-prev-case" },
   },
   ["jump-hole"] = {
     impl = function(args)
       local direction = args[1]
-      Jump.jump_to_typed_hole(direction)
+      require("ocaml.commands.jump").jump_to_typed_hole(direction)
     end,
     complete = { "next", "prev" },
   },
   phrase = {
     impl = function(args)
       local direction = args[1]
-      Jump.phrase(direction)
+      require("ocaml.commands.jump").phrase(direction)
     end,
     complete = { "next", "prev" },
+  },
+  ["expand-ppx"] = {
+    impl = function()
+      require("ocaml.commands.expand_ppx").expand_ppx()
+    end,
   },
 }
 
@@ -88,17 +89,17 @@ end
 local lsp_subcmd_tbl = {
   start = {
     impl = function()
-      LSP.start()
+      require("ocaml.lsp").start()
     end,
   },
   stop = {
     impl = function()
-      LSP.stop()
+      require("ocaml.lsp").stop()
     end,
   },
   restart = {
     impl = function()
-      LSP.restart()
+      require("ocaml.lsp").restart()
     end,
   },
 }
@@ -109,22 +110,22 @@ register_subcommand_tbl("lsp", lsp_subcmd_tbl)
 local dune_subcmd_tbl = {
   ["build-watch"] = {
     impl = function()
-      Dune.start_watch()
+      require("ocaml.commands.dune").start_watch()
     end,
   },
   ["build-watch-stop"] = {
     impl = function()
-      Dune.stop_watch()
+      require("ocaml.commands.dune").stop_watch()
     end,
   },
   ["build-watch-status"] = {
     impl = function()
-      Dune.status()
+      require("ocaml.commands.dune").status()
     end,
   },
   promote = {
     impl = function()
-      Dune.promote_file()
+      require("ocaml.commands.dune").promote_file()
     end,
   },
 }
