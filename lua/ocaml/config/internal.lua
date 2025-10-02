@@ -25,16 +25,6 @@ local OcamlDefaultConfig = {
       syntaxDocumentation = true,
       merlinJumpCodeActions = true,
     },
-    ---@type ocaml.lsp.Experimental
-    experimental = {
-      switchImplIntf = false,
-      inferIntf = false,
-      typedHoles = false,
-      typeEnclosing = false,
-      construct = false,
-      destruct = false,
-      jumpToNextHole = false,
-    },
   },
 }
 

@@ -37,40 +37,6 @@ local function is_esy_sandbox(dir)
   return manifest and has_esy_field
 end
 
--- Get the lsp command for the given directory.
--- Priority: esy sandbox > opam local switch > global command
--- @param dir string The directory to check
--- @param args string[] Additional arguments to pass to the lsp command
--- @return string[] The lsp command
-function M.get_lsp_command(dir, args)
-  local cmd = { "ocamllsp" }
-  -- insert additional args
-  vim.list_extend(cmd, args or {})
-
-  -- Check esy first (higher priority)
-  if is_esy_sandbox(dir) then
-    local esy_cmd = Esy.get_command(Esy.get_project_manifest(dir), cmd)
-    if esy_cmd then
-      return esy_cmd
-    end
-  end
-
-  -- Check opam local switch
-  if vim.fn.executable("opam") == 1 then
-    local sandbox, _ = Opam.create_sandbox()
-    local switch = Opam.get_local_switch(sandbox, dir)
-    if switch then
-      local opam_cmd = Opam.get_command(sandbox, switch, cmd)
-      if opam_cmd then
-        return opam_cmd
-      end
-    end
-  end
-
-  -- Fallback to global command
-  return cmd
-end
-
 -- Get the sandboxed command for any OCaml tool in the given directory.
 -- Priority: esy sandbox > opam local switch > global command
 -- @param dir string The directory to check
@@ -99,6 +65,19 @@ function M.get_command(dir, cmd)
 
   -- Fallback to global command
   return cmd
+end
+
+-- Get the LSP command for the given directory.
+-- Priority: esy sandbox > opam local switch > global command
+-- @param dir string The directory to check
+-- @param args string[] Additional arguments to pass to the lsp command
+-- @return string[] The lsp command
+function M.get_lsp_command(dir, args)
+  local cmd = { "ocamllsp" }
+  -- insert additional args
+  vim.list_extend(cmd, args or {})
+
+  return M.get_command(dir, cmd)
 end
 
 return M

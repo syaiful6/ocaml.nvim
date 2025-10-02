@@ -46,9 +46,6 @@ vim.g.ocamlnvim = vim.g.ocamlnvim or {}
 ---LSP server settings
 ---@field settings? ocaml.lsp.Settings
 ---
----Experimental capabilities
----@field experimental? ocaml.lsp.Experimental
-
 ---@class ocaml.lsp.Settings
 ---OCaml LSP server configuration settings
 ---
@@ -57,29 +54,5 @@ vim.g.ocamlnvim = vim.g.ocamlnvim or {}
 ---
 ---Enable/disable syntax documentation
 ---@field syntaxDocumentation? boolean
-
----@class ocaml.lsp.Experimental
----Experimental OCaml LSP features
----
----Enable switching between implementation and interface files
----@field switchImplIntf? boolean
----
----Enable interface inference
----@field inferIntf? boolean
----
----Enable typed holes support
----@field typedHoles? boolean
----
----Enable type enclosing
----@field typeEnclosing? boolean
----
----Enable construct handling
----@field construct? boolean
----
----Enable destruct handling
----@field destruct? boolean
----
----Enable jump to next hole functionality
----@field jumpToNextHole? boolean
 
 return M
