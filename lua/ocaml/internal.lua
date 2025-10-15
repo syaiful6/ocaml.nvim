@@ -33,9 +33,7 @@ local function init()
 
   setup_formatter()
 
-  local ts = require("ocaml.treesitter")
-  ts.install_reason()
-  ts.install_mlx()
+  require("ocaml.treesitter").install_language_parsers()
 
   --- Setup OCaml commands
   require("ocaml.commands").setup()
