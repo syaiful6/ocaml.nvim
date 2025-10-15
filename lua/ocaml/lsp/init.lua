@@ -37,9 +37,12 @@ local function configure_filetypes(lsp_config)
     "ocaml.menhir",
     "ocaml.ocamllex",
     "reason",
+    "reason.interface",
     "ocaml.mlx",
     "ocaml.cram",
     "dune",
+    "dune-project",
+    "dune-workspace",
   }
 
   for _, ft in ipairs(ensure_filetypes) do
@@ -50,18 +53,22 @@ local function configure_filetypes(lsp_config)
 
   local original_get_language_id = lsp_config.get_language_id
   local get_language_id = function(buf, filetype)
+    -- Map filetypes to language IDs expected by ocamllsp
+    -- See: https://github.com/ocaml/ocaml-lsp/blob/master/ocaml-lsp-server/src/document.ml
     if filetype == "ocaml.interface" then
-      return "ocaml"
+      return "ocaml.interface"
     elseif filetype == "ocaml.menhir" then
-      return "menhir"
+      return "ocaml.menhir"
     elseif filetype == "ocaml.ocamllex" then
-      return "ocamllex"
-    elseif filetype == "reason" then
+      return "ocaml.ocamllex"
+    elseif filetype == "reason" or filetype == "reason.interface" then
       return "reason"
     elseif filetype == "ocaml.mlx" then
-      return "mlx"
+      return "ocaml"
     elseif filetype == "ocaml.cram" then
       return "cram"
+    elseif filetype == "dune" or filetype == "dune-project" or filetype == "dune-workspace" then
+      return "dune"
     else
       return original_get_language_id and original_get_language_id(buf, filetype) or filetype
     end
@@ -102,8 +109,9 @@ M.start = function(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
   local bufname = vim.api.nvim_buf_get_name(bufnr)
   local ocaml_config = vim.lsp.config[lsp_helpers.ocaml_client_name] or {}
+  local client_config = vim.tbl_deep_extend("force", ocaml_config, config.lsp or {}) --[[@as ocaml.lsp.ClientConfig]]
   ---@type ocaml.lsp.StartConfig
-  local lsp_start_config = vim.tbl_deep_extend("force", config.lsp, ocaml_config) --[[@as ocaml.lsp.StartConfig]]
+  local lsp_start_config = vim.tbl_deep_extend("force", {}, client_config) --[[@as ocaml.lsp.StartConfig]]
 
   -- Find project root using OCaml-specific patterns
   local root_dir = helpers.root_pattern(
