@@ -4,6 +4,7 @@
 ---]]
 
 local LspHelpers = require("ocaml.lsp.helpers")
+local Picker = require("ocaml.picker")
 local M = {}
 
 --- Jump to next or previous typed hole at a given
@@ -80,22 +81,6 @@ end
 ---@class ocaml.commands.JumpRequest: lsp.TextDocumentPositionParams
 ---@field target? "fun" | "let" | "module-type" | "match" | "match-next-case" | "match-prev-case" one of merlin's jump targets
 
---- Helper to show jumps in telescope
----@param jumps ocaml.commands.Jump[]
-local show_ui_jumps = function(jumps)
-  vim.ui.select(jumps, {
-    prompt = "Select jump target:",
-    format_item = function(item)
-      return string.format("%s (line %d, col %d)", item.target, item.position.line + 1, item.position.character + 1)
-    end,
-  }, function(choice)
-    if choice then
-      local pos = choice.position
-      vim.api.nvim_win_set_cursor(0, { pos.line + 1, pos.character })
-    end
-  end)
-end
-
 ---@param target? "fun" | "let" | "module-type" | "match" | "match-next-case" | "match-prev-case" one of merlin's jump targets
 ---@return nil
 function M.merlin_jump(target)
@@ -121,7 +106,18 @@ function M.merlin_jump(target)
       return
     end
     --- If there are multiple jumps, show a selection UI
-    show_ui_jumps(jumps)
+    Picker.select(jumps, {
+      prompt = "Select jump target:",
+      format_item = function(item)
+        return string.format("%s (line %d, col %d)", item.target, item.position.line + 1, item.position.character + 1)
+      end,
+      on_choice = function(choice)
+        if choice then
+          local pos = choice.position
+          vim.api.nvim_win_set_cursor(0, { pos.line + 1, pos.character })
+        end
+      end,
+    })
   end)
 end
 
