@@ -51,6 +51,9 @@ detection, LSP integration, and comprehensive filetype support.
   "ocaml/ocaml.nvim",
   dependencies = {
     "nvim-treesitter/nvim-treesitter",
+    -- Optional: for enhanced UI pickers (recommended)
+    -- "ibhagwan/fzf-lua",  -- or
+    -- "nvim-telescope/telescope.nvim",
   },
 }
 ```
@@ -60,7 +63,12 @@ detection, LSP integration, and comprehensive filetype support.
 ```lua
 use {
   "ocaml/ocaml.nvim",
-  requires = { "nvim-treesitter/nvim-treesitter" },
+  requires = {
+    "nvim-treesitter/nvim-treesitter",
+    -- Optional: for enhanced UI pickers (recommended)
+    -- "ibhagwan/fzf-lua",  -- or
+    -- "nvim-telescope/telescope.nvim",
+  },
 }
 ```
 
@@ -68,8 +76,17 @@ use {
 
 ```vim
 Plug 'nvim-treesitter/nvim-treesitter'
+" Optional: for enhanced UI pickers (recommended)
+" Plug 'ibhagwan/fzf-lua'  " or
+" Plug 'nvim-telescope/telescope.nvim'
 Plug 'ocaml/ocaml.nvim'
 ```
+
+### Optional Dependencies
+
+- **fzf-lua** or **telescope.nvim**: Provides enhanced fuzzy pickers with live
+  search for commands like `:OCaml type-search`. Falls back to `vim.ui.select`
+  if neither is installed.
 
 ## ⚠️ Important LSP Configuration
 
@@ -197,6 +214,87 @@ All plugin commands are available as subcommands under `:OCaml`:
 :OCaml lsp restart   " Restart LSP server
 ```
 
+#### Code Navigation
+
+```vim
+" Jump to definition (fun, let, module, module-type, match,
+" match-next-case, match-prev-case)
+:OCaml jump [target]
+:OCaml jump-hole [next|prev]      " Jump to next/previous typed hole
+" Jump to next/previous phrase (top-level definition)
+:OCaml phrase [next|prev]
+```
+
+#### Code Manipulation
+
+```vim
+:OCaml expand-ppx                 " Expand PPX at cursor position
+" Search functions by type signature and insert selected result
+:OCaml type-search [query]
+" Show type of expression under cursor with enclosing navigation
+:OCaml type-enclosing
+```
+
+**Type Search** allows you to search for functions by their type signature
+using the `ocamllsp/typeSearch` LSP method:
+
+```vim
+:OCaml type-search                " Prompt for query, then show results
+:OCaml type-search int -> string  " Search for functions matching the type
+```
+
+After entering a query, you'll get an interactive picker (fzf-lua or telescope
+if available) showing all matching functions with their types, file locations,
+and documentation previews. You can then use the picker's fuzzy matching to
+further refine results. Selecting a result inserts the constructible form at
+the cursor position and displays full documentation in a floating window.
+
+**Type Enclosing** shows the type of the expression under your cursor and
+allows you to navigate through progressively larger enclosing expressions:
+
+```vim
+:OCaml type-enclosing
+```
+
+Once the floating window appears, you can:
+
+- `↑` or `K`: Show type of larger enclosing expression (zoom out)
+- `↓` or `J`: Show type of smaller enclosing expression (zoom in)
+- `d`: Delete the currently highlighted expression
+- `y`: Yank (copy) the currently highlighted expression
+- `c`: Change the currently highlighted expression (delete and enter insert mode)
+- `q` or `Esc`: Close the window
+
+This is useful for understanding complex expressions and debugging type errors
+by seeing how OCaml infers types at different levels of your code. The operator
+support (d/y/c) allows you to quickly manipulate expressions based on their type
+boundaries.
+
+#### AST-based Selection
+
+```vim
+:OCaml select-ast         " Select the wrapping AST node at cursor
+```
+
+**AST Selection** allows you to select code based on OCaml's AST structure:
+
+- `:OCaml select-ast` - Selects the smallest AST node containing the cursor
+  (uses `ocamllsp/wrappingAstNode`)
+
+This is useful for quickly selecting logical code blocks (expressions, statements,
+modules) based on the OCaml AST.
+
+For expanding/shrinking selections and applying operators (delete, yank, change),
+use `:OCaml type-enclosing` instead, which provides interactive navigation and
+operator support.
+
+**Suggested keybinding**:
+
+```lua
+vim.keymap.set('n', '<leader>v', ':OCaml select-ast<CR>',
+  { desc = 'Select AST node' })
+```
+
 #### Dune Integration
 
 ```vim
@@ -217,11 +315,29 @@ the promotion.
 
 #### TreeSitter Support
 
-```vim
+The plugin automatically registers custom TreeSitter parsers for various
+OCaml file types. Install the parsers you need using nvim-treesitter:
 
-:OCaml ts install_reason  " Install Reason TreeSitter parser
-:OCaml ts install_mlx     " Install MLX TreeSitter parser
+```vim
+:TSInstall ocaml              " OCaml implementation files (.ml)
+:TSInstall ocaml_interface    " OCaml interface files (.mli)
+:TSInstall menhir             " Menhir parser files (.mly)
+:TSInstall ocamllex           " OCamllex lexer files (.mll)
+:TSInstall ocaml_mlx          " OCaml JSX files (.mlx)
+:TSInstall reason             " Reason files (.re, .rei)
+:TSInstall cram               " Cram test files (.t)
 ```
+
+**Filetype to TreeSitter parser mappings** (automatically registered):
+
+- `ocaml.interface` → `ocaml_interface`
+- `ocaml.menhir` → `menhir`
+- `ocaml.ocamllex` → `ocamllex`
+- `ocaml.mlx` → `ocaml_mlx`
+- `ocaml.cram` → `cram`
+- `reason` / `reason.interface` → `reason`
+
+You only need to install the parsers for the file types you use.
 
 ### Code Formatting
 

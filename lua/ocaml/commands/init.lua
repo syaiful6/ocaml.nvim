@@ -45,6 +45,26 @@ local command_tbl = {
       require("ocaml.commands.expand_ppx").expand_ppx()
     end,
   },
+  ["type-search"] = {
+    impl = function(args)
+      local query = table.concat(args, " ")
+      if query and query ~= "" then
+        require("ocaml.commands.type_search").type_search(query)
+      else
+        require("ocaml.commands.type_search").type_search_prompt()
+      end
+    end,
+  },
+  ["type-enclosing"] = {
+    impl = function()
+      require("ocaml.commands.type_enclosing").show_type_enclosing()
+    end,
+  },
+  ["select-ast"] = {
+    impl = function()
+      require("ocaml.commands.select_ast").select_wrapping_ast_node()
+    end,
+  },
 }
 
 ---@param name string The name of the subcommand
@@ -164,6 +184,7 @@ end
 function M.setup()
   vim.api.nvim_create_user_command("OCaml", ocaml_command_impl, {
     nargs = "+",
+    range = true, -- Allow calling from visual mode
     complete = function(arg_lead, cmdline, _)
       local commands = cmdline:match("^['<,'>]*OCaml!") ~= nil
           and filter_keys_by_value(function(c)
