@@ -298,9 +298,6 @@ vim.keymap.set('n', '<leader>v', ':OCaml select-ast<CR>',
 #### Dune Integration
 
 ```vim
-:OCaml dune build-watch        " Start dune build in watch mode
-:OCaml dune build-watch-stop   " Stop dune build watch
-:OCaml dune build-watch-status " Check dune watch status
 :OCaml dune promote            " Promote current file changes
 ```
 

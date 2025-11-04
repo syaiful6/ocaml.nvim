@@ -128,21 +128,6 @@ register_subcommand_tbl("lsp", lsp_subcmd_tbl)
 
 ---@type table<string, ocaml.commands.Subcommand>
 local dune_subcmd_tbl = {
-  ["build-watch"] = {
-    impl = function()
-      require("ocaml.commands.dune").start_watch()
-    end,
-  },
-  ["build-watch-stop"] = {
-    impl = function()
-      require("ocaml.commands.dune").stop_watch()
-    end,
-  },
-  ["build-watch-status"] = {
-    impl = function()
-      require("ocaml.commands.dune").status()
-    end,
-  },
   promote = {
     impl = function()
       require("ocaml.commands.dune").promote_file()
