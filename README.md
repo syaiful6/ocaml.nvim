@@ -224,6 +224,8 @@ All plugin commands are available as subcommands under `:OCaml`:
 :OCaml type-enclosing
 " Fill typed holes with suggested constructions
 :OCaml construct
+" Generate exhaustive pattern matching (destruct expression)
+:OCaml destruct
 " Get documentation for any identifier
 :OCaml doc <identifier>
 ```
@@ -273,6 +275,25 @@ Place your cursor on a typed hole (`_`) and run this command to get suggestions
 for filling it. This is particularly useful after using destruct or when working
 with complex pattern matches. You'll get a picker to select from valid constructions
 that match the expected type.
+
+**Destruct** generates exhaustive pattern matching by enumerating all constructors:
+
+```vim
+:OCaml destruct
+```
+
+This command works in multiple contexts:
+
+- **On an expression**: Wraps it in a pattern match with branches for all
+  constructors (e.g., `Some 10` → `match Some 10 with | None -> _ | Some _ -> _`)
+- **On a wildcard pattern** (`_`): Refines it by expanding into specific
+  constructor patterns
+- **On non-exhaustive matches**: Adds missing cases to make the pattern match
+  exhaustive
+
+The command automatically applies the "Destruct (enumerate cases)" code action at
+the cursor position or visual selection. This pairs well with `:OCaml construct`
+to fill in the generated typed holes.
 
 **Documentation Lookup** retrieves odoc documentation for any identifier without
 navigating to it:

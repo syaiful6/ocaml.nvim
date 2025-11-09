@@ -71,6 +71,11 @@ local command_tbl = {
       require("ocaml.commands.construct").construct()
     end,
   },
+  ["destruct"] = {
+    impl = function()
+      require("ocaml.commands.construct").destruct()
+    end,
+  },
   ["doc"] = {
     impl = function(args)
       local identifier = table.concat(args, " ")

@@ -1,9 +1,14 @@
 ---@mod ocaml.commands.construct
 ---@brief [[
---- Commands to fill typed holes (_). Such holes sometimes appear in the result
---- of other commands like destruct and can also be inserted manually in the source.
---- The command is already accessible through the built-in LSP code action menu, however
---- in certain situations it may be more convenient to have a dedicated command.
+--- Commands for pattern matching construction and deconstruction.
+---
+--- - construct: Fill typed holes (_) with suggested constructions. Such holes sometimes
+---   appear in the result of destruct and can also be inserted manually in the source.
+--- - destruct: Generate exhaustive pattern matching for expressions by enumerating all
+---   possible constructors of the type.
+---
+--- Both commands are also accessible through the built-in LSP code action menu, however
+--- in certain situations it may be more convenient to have dedicated commands.
 ---@brief ]]
 
 local LspHelpers = require("ocaml.lsp.helpers")
@@ -59,6 +64,21 @@ function M.construct()
       end,
     })
   end)
+end
+
+--- Generate exhaustive pattern matching by enumerating all constructors
+--- of the expression's type at the cursor position.
+---
+--- This replaces the expression with a match statement containing branches
+--- for all possible constructors. Can also be used on wildcard patterns to
+--- refine them or on non-exhaustive matches to add missing cases.
+function M.destruct()
+  vim.lsp.buf.code_action({
+    filter = function(action)
+      return action.title:match("^Destruct%s*%(") ~= nil
+    end,
+    apply = true,
+  })
 end
 
 return M
