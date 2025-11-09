@@ -1,9 +1,5 @@
 # ocaml.nvim
 
-> [!WARNING]
-> This plugin is in early development and may not work as expected.
-> Breaking changes may occur without notice.
-
 A comprehensive Neovim plugin for OCaml development with intelligent sandbox
 detection, LSP integration, and comprehensive filetype support.
 
@@ -120,13 +116,6 @@ the `ocamllsp` server in your LSP configuration to prevent conflicts:
 }
 ```
 
-**Why this is important**: Even with `autostart = false`, incomplete LSP configurations
-can cause errors when Neovim tries to resolve LSP commands. Setting the server to
-`false` completely removes it from the global LSP configuration.
-
-This plugin provides intelligent sandbox detection (esy, opam, global) and will
-automatically start the appropriate LSP server with the correct configuration.
-
 ## 🔧 Configuration
 
 The plugin works out of the box with sensible defaults. For advanced configuration:
@@ -185,7 +174,7 @@ This plugin supports all the advanced features from the VSCode OCaml Platform:
 - **Construct/Destruct**: Advanced code manipulation features
 - **Jump to Next Hole**: Navigate between typed holes in your code
 
-All features are disabled by default but can be enabled individually through
+All features are enabled by default but can be disabled individually through
 configuration.
 
 ## 🚀 Usage
@@ -233,6 +222,12 @@ All plugin commands are available as subcommands under `:OCaml`:
 :OCaml type-search [query]
 " Show type of expression under cursor with enclosing navigation
 :OCaml type-enclosing
+" Fill typed holes with suggested constructions
+:OCaml construct
+" Generate exhaustive pattern matching (destruct expression)
+:OCaml destruct
+" Get documentation for any identifier
+:OCaml doc <identifier>
 ```
 
 **Type Search** allows you to search for functions by their type signature
@@ -269,6 +264,49 @@ This is useful for understanding complex expressions and debugging type errors
 by seeing how OCaml infers types at different levels of your code. The operator
 support (d/y/c) allows you to quickly manipulate expressions based on their type
 boundaries.
+
+**Construct** fills typed holes (`_`) with suggested constructions:
+
+```vim
+:OCaml construct
+```
+
+Place your cursor on a typed hole (`_`) and run this command to get suggestions
+for filling it. This is particularly useful after using destruct or when working
+with complex pattern matches. You'll get a picker to select from valid constructions
+that match the expected type.
+
+**Destruct** generates exhaustive pattern matching by enumerating all constructors:
+
+```vim
+:OCaml destruct
+```
+
+This command works in multiple contexts:
+
+- **On an expression**: Wraps it in a pattern match with branches for all
+  constructors (e.g., `Some 10` → `match Some 10 with | None -> _ | Some _ -> _`)
+- **On a wildcard pattern** (`_`): Refines it by expanding into specific
+  constructor patterns
+- **On non-exhaustive matches**: Adds missing cases to make the pattern match
+  exhaustive
+
+The command automatically applies the "Destruct (enumerate cases)" code action at
+the cursor position or visual selection. This pairs well with `:OCaml construct`
+to fill in the generated typed holes.
+
+**Documentation Lookup** retrieves odoc documentation for any identifier without
+navigating to it:
+
+```vim
+:OCaml doc List.map
+:OCaml doc String.concat
+```
+
+This displays the full documentation (signature, description, examples) in a
+floating window with markdown rendering. Press `q` or `Esc` to close. This is
+more convenient than using hover (`K`) when you want to look up documentation
+for functions/modules you're not currently at.
 
 #### AST-based Selection
 

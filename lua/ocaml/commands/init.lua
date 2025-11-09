@@ -1,7 +1,8 @@
 ---@mod ocaml.commands
 ---@brief [[
 ---User commands for OCaml development
----]]
+
+---@brief ]]
 
 local M = {}
 
@@ -63,6 +64,22 @@ local command_tbl = {
   ["select-ast"] = {
     impl = function()
       require("ocaml.commands.select_ast").select_wrapping_ast_node()
+    end,
+  },
+  ["construct"] = {
+    impl = function()
+      require("ocaml.commands.construct").construct()
+    end,
+  },
+  ["destruct"] = {
+    impl = function()
+      require("ocaml.commands.construct").destruct()
+    end,
+  },
+  ["doc"] = {
+    impl = function(args)
+      local identifier = table.concat(args, " ")
+      require("ocaml.commands.doc").get_documentation(identifier)
     end,
   },
 }
