@@ -43,13 +43,16 @@ M.buf_request = function(bufnr, method, params, handler)
   return client_found
 end
 
---- Get OCaml LSP command using sandbox detection
+--- Resolve the sandbox for a project root and build the OCaml LSP command.
 ---
 ---@param root_dir string The project root directory
----@return string[] The LSP command array
-M.get_lsp_cmd = function(root_dir)
+---@param cb fun(cmd: string[]|nil, sandbox: ocaml.sandbox.Sandbox, err: string|nil)
+M.get_lsp_cmd = function(root_dir, cb)
   local sandbox = require("ocaml.sandbox")
-  return sandbox.get_lsp_command(root_dir, {})
+  sandbox.resolve(root_dir, function(sb)
+    local cmd, err = sandbox.get_lsp_command(sb, {})
+    cb(cmd, sb, err)
+  end)
 end
 
 return M

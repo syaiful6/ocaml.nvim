@@ -3,81 +3,111 @@
 ---@brief [[
 ---WARNING: This is not part of the public API. It may change without warning.
 ---Use at your own risk.
-
+---
+---A sandbox is an environment that provides the OCaml toolchain for a project
+---(an opam switch, an esy project, ...). Each kind of sandbox is implemented by
+---a provider. Providers detect candidate sandboxes for a project root and know
+---how to wrap a command so it runs inside one of them.
 ---@brief ]]
+
+---@class ocaml.sandbox.Sandbox
+---Stable, serializable identifier, such as "opam:/path/to/proj", "esy:/path/esy.json", or "global".
+---@field id string
+---Name of the provider that detected this sandbox.
+---@field provider string
+---Human readable description, for pickers and messages.
+---@field label string
+---Project root where this sandbox was detected.
+---@field root string
+---Provider-specific data. Only the owning provider should read it.
+---@field data table
+
+---@class ocaml.sandbox.Provider
+---Unique provider name; also the prefix of the sandbox ids it produces.
+---@field name string
+---Detect candidate sandboxes for a project root. Call `cb` exactly once with
+---an empty list when nothing is found. Detection may finish synchronously.
+---@field detect fun(root: string, cb: fun(candidates: ocaml.sandbox.Sandbox[]))
+---Wrap `cmd` so it runs inside `sandbox`, or return nil if that is impossible.
+---@field wrap fun(sandbox: ocaml.sandbox.Sandbox, cmd: string[]): string[]|nil
+---Extra environment variables needed to use the sandbox's toolchain.
+---@field env? fun(sandbox: ocaml.sandbox.Sandbox): table<string, string>|nil
 
 ---@class ocaml.Sandbox
 local M = {}
-local Esy = require("ocaml.sandbox.esy")
-local Opam = require("ocaml.sandbox.opam")
 
--- Detect if the given directory is an esy sandbox.
--- @param dir string The directory to check
--- @return boolean True if the directory is an esy sandbox, false otherwise
-local function is_esy_sandbox(dir)
-  -- first check if esy command is available
-  if vim.fn.executable("esy") == 0 then
-    return false
-  end
+---Provider priority. Resolution uses the first candidate found.
+---@type string[]
+local priority = { "esy", "opam", "global" }
 
-  local manifest = Esy.get_project_manifest(dir)
-  if not manifest then
-    return false
+---@param name string
+---@return ocaml.sandbox.Provider|nil
+function M.get_provider(name)
+  local ok, provider = pcall(require, "ocaml.sandbox.providers." .. name)
+  if ok then
+    return provider
   end
-  -- if there's a manifest, check if it has an "esy" field
-  local has_esy_field = false
-  local ok, content = pcall(vim.fn.readfile, manifest)
-  if not ok or not content then
-    return false
-  end
-  local ok_json, json = pcall(vim.fn.json_decode, content)
-  if ok_json and json and type(json) == "table" then
-    has_esy_field = json["esy"] ~= nil
-  end
-  return manifest and has_esy_field
 end
 
--- Get the sandboxed command for any OCaml tool in the given directory.
--- Priority: esy sandbox > opam local switch > global command
--- @param dir string The directory to check
--- @param cmd string[] The command to run (e.g., {"dune", "build", "--watch"})
--- @return string[] The sandboxed command
-function M.get_command(dir, cmd)
-  -- Check esy first (higher priority)
-  if is_esy_sandbox(dir) then
-    local esy_cmd = Esy.get_command(Esy.get_project_manifest(dir), cmd)
-    if esy_cmd then
-      return esy_cmd
+---Resolve the sandbox to use for a project root.
+---Providers are tried in priority order; the first candidate found is used.
+---The "global" provider is last and always matches.
+---@param root string The project root
+---@param cb fun(sandbox: ocaml.sandbox.Sandbox)
+function M.resolve(root, cb)
+  local i = 0
+  local function next_provider()
+    i = i + 1
+    local name = priority[i]
+    if not name then
+      -- Keep a fallback in case the priority list is changed.
+      return M.get_provider("global").detect(root, function(candidates)
+        cb(candidates[1])
+      end)
     end
-  end
 
-  -- Check opam local switch
-  if vim.fn.executable("opam") == 1 then
-    local sandbox, _ = Opam.create_sandbox()
-    local switch = Opam.get_local_switch(sandbox, dir)
-    if switch then
-      local opam_cmd = Opam.get_command(sandbox, switch, cmd)
-      if opam_cmd then
-        return opam_cmd
+    local provider = M.get_provider(name)
+    if not provider then
+      return next_provider()
+    end
+
+    provider.detect(root, function(candidates)
+      if candidates[1] then
+        cb(candidates[1])
+      else
+        next_provider()
       end
-    end
+    end)
   end
-
-  -- Fallback to global command
-  return cmd
+  next_provider()
 end
 
--- Get the LSP command for the given directory.
--- Priority: esy sandbox > opam local switch > global command
--- @param dir string The directory to check
--- @param args string[] Additional arguments to pass to the lsp command
--- @return string[] The lsp command
-function M.get_lsp_command(dir, args)
-  local cmd = { "ocamllsp" }
-  -- insert additional args
-  vim.list_extend(cmd, args or {})
+---Wrap a command for the given sandbox.
+---@param sandbox ocaml.sandbox.Sandbox
+---@param cmd string[] e.g. { "dune", "build", "--watch" }
+---@return string[]|nil cmd The wrapped command, or nil on failure
+---@return string|nil err
+function M.get_command(sandbox, cmd)
+  local provider = M.get_provider(sandbox.provider)
+  if not provider then
+    return nil, "unknown sandbox provider: " .. sandbox.provider
+  end
+  local wrapped = provider.wrap(sandbox, cmd)
+  if not wrapped then
+    return nil, ("sandbox %s cannot run %s"):format(sandbox.id, table.concat(cmd, " "))
+  end
+  return wrapped
+end
 
-  return M.get_command(dir, cmd)
+---Build the ocamllsp command for the given sandbox.
+---@param sandbox ocaml.sandbox.Sandbox
+---@param args? string[] Additional arguments for ocamllsp
+---@return string[]|nil cmd
+---@return string|nil err
+function M.get_lsp_command(sandbox, args)
+  local cmd = { "ocamllsp" }
+  vim.list_extend(cmd, args or {})
+  return M.get_command(sandbox, cmd)
 end
 
 return M
