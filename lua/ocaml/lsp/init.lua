@@ -146,30 +146,11 @@ No project root found.
   lsp_start_config.filetypes = filetypes
   lsp_start_config.get_language_id = get_language_id
 
-  -- Get and validate LSP command
-  local lsp_cmd = lsp_helpers.get_lsp_cmd(normalized_cwd)
-  if not lsp_cmd or type(lsp_cmd) ~= "table" or #lsp_cmd == 0 then
-    vim.notify("[ocaml.nvim] Invalid LSP command: " .. vim.inspect(lsp_cmd), vim.log.levels.ERROR)
-    return
-  end
-
-  -- Ensure all command arguments are strings
-  for i, arg in ipairs(lsp_cmd) do
-    if type(arg) ~= "string" then
-      vim.notify("[ocaml.nvim] Invalid LSP command argument at index " .. i .. ": " .. type(arg), vim.log.levels.ERROR)
-      return
-    end
-  end
-
-  lsp_start_config.cmd = vim.deepcopy(lsp_cmd)
   lsp_start_config.name = lsp_helpers.ocaml_client_name
 
-  -- Check if client is already running for this project
-  local clients = lsp_helpers.get_active_lsp_clients()
-  for _, client in ipairs(clients) do
-    local client_root_dir = vim.fs.normalize(client.config.root_dir or "")
-    if client_root_dir == normalized_cwd then
-      -- Client already running for this project
+  -- Reuse the project's client instead of resolving its sandbox again.
+  for _, client in ipairs(lsp_helpers.get_active_lsp_clients()) do
+    if vim.fs.normalize(client.config.root_dir or "") == normalized_cwd then
       vim.lsp.buf_attach_client(bufnr, client.id)
       return
     end
@@ -183,12 +164,35 @@ No project root found.
     end
   end
 
-  -- Start new LSP client
-  local client_id = vim.lsp.start(lsp_start_config, { bufnr = bufnr })
+  lsp_helpers.get_lsp_cmd(normalized_cwd, function(lsp_cmd, _, err)
+    -- Sandbox detection may outlive the buffer.
+    if not vim.api.nvim_buf_is_valid(bufnr) then
+      return
+    end
 
-  if not client_id then
-    vim.notify("[ocaml.nvim] Failed to start OCaml LSP server", vim.log.levels.ERROR)
-  end
+    if not lsp_cmd or #lsp_cmd == 0 then
+      vim.notify("[ocaml.nvim] Invalid LSP command: " .. (err or vim.inspect(lsp_cmd)), vim.log.levels.ERROR)
+      return
+    end
+
+    -- Ensure all command arguments are strings
+    for i, arg in ipairs(lsp_cmd) do
+      if type(arg) ~= "string" then
+        vim.notify(
+          "[ocaml.nvim] Invalid LSP command argument at index " .. i .. ": " .. type(arg),
+          vim.log.levels.ERROR
+        )
+        return
+      end
+    end
+
+    lsp_start_config.cmd = lsp_cmd
+
+    local client_id = vim.lsp.start(lsp_start_config, { bufnr = bufnr })
+    if not client_id then
+      vim.notify("[ocaml.nvim] Failed to start OCaml LSP server", vim.log.levels.ERROR)
+    end
+  end)
 end
 
 ---Stop LSP client for the current buffer
