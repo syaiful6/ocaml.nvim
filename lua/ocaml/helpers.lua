@@ -95,4 +95,39 @@ function M.escape_glob_wildcards(path)
   return escaped_path
 end
 
+---Default timeout for external commands, in milliseconds.
+M.SYSTEM_TIMEOUT = 10000
+
+---Run a command asynchronously and return its stdout split into lines.
+---`cb` always runs on the main loop, so it may call any API.
+---@param cmd string[]
+---@param cb fun(lines: string[]|nil, err: string|nil)
+---@param opts? { timeout?: integer, cwd?: string }
+function M.system_lines(cmd, cb, opts)
+  opts = opts or {}
+  local ok, err = pcall(vim.system, cmd, {
+    text = true,
+    cwd = opts.cwd,
+    timeout = opts.timeout or M.SYSTEM_TIMEOUT,
+  }, function(result)
+    vim.schedule(function()
+      if result.code ~= 0 then
+        local reason = result.signal ~= 0 and ("killed by signal " .. result.signal) or ("exit code " .. result.code)
+        local stderr = vim.trim(result.stderr or "")
+        return cb(
+          nil,
+          ("`%s` failed (%s)%s"):format(table.concat(cmd, " "), reason, stderr ~= "" and ": " .. stderr or "")
+        )
+      end
+      cb(vim.split(result.stdout or "", "\n", { trimempty = true }), nil)
+    end)
+  end)
+  -- vim.system throws synchronously when the executable cannot be spawned
+  if not ok then
+    vim.schedule(function()
+      cb(nil, tostring(err))
+    end)
+  end
+end
+
 return M

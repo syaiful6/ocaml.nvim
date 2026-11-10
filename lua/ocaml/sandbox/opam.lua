@@ -6,6 +6,8 @@
 
 ---@brief ]]
 
+local Helpers = require("ocaml.helpers")
+
 ---@class ocaml.sandbox.Opam
 local M = {}
 
@@ -60,29 +62,22 @@ end
 
 --- Get the list of switches in the sandbox
 --- @param sandbox ocaml.sandbox.opam.Sandbox The opam sandbox
---- @return string[]|nil switches The list of switch names, or nil on error
---- @return string|nil error The error message if any
-function M.get_switches(sandbox)
-  local args = { "switch", "list", "-s" }
-  local command = get_opam_command_util(sandbox, args)
-  if not command then
-    return nil, "Invalid sandbox"
-  end
-
-  local output = vim.fn.systemlist(command)
-  if vim.v.shell_error ~= 0 then
-    return nil, "Error executing opam command: " .. table.concat(command, " ")
-  end
-
-  local switches = {}
-  for _, line in ipairs(output) do
-    local trimmed = vim.trim(line)
-    if trimmed ~= "" then
-      table.insert(switches, trimmed)
+--- @param cb fun(switches: string[]|nil, err: string|nil)
+function M.get_switches(sandbox, cb)
+  local command = get_opam_command_util(sandbox, { "switch", "list", "-s" })
+  Helpers.system_lines(command, function(lines, err)
+    if not lines then
+      return cb(nil, err)
     end
-  end
-
-  return switches, nil
+    local switches = {}
+    for _, line in ipairs(lines) do
+      local trimmed = vim.trim(line)
+      if trimmed ~= "" then
+        table.insert(switches, trimmed)
+      end
+    end
+    cb(switches, nil)
+  end)
 end
 
 --- Check if a switch is local (is an absolute or relative path)
@@ -124,21 +119,21 @@ end
 
 --- Get opam version
 --- @param opam_binary string|nil The opam binary path (defaults to "opam")
---- @return ocaml.sandbox.opam.Version|nil Version info, or nil on error
---- @return string|nil error The error message if any
-function M.get_version(opam_binary)
-  local command = { opam_binary or "opam", "--version" }
-  local output = vim.fn.systemlist(command)
-
-  if vim.v.shell_error ~= 0 then
-    return nil, "Error executing opam --version"
-  end
-
-  if #output == 0 then
-    return nil, "No version output"
-  end
-
-  return M.parse_version(output[1]), nil
+--- @param cb fun(version: ocaml.sandbox.opam.Version|nil, err: string|nil)
+function M.get_version(opam_binary, cb)
+  Helpers.system_lines({ opam_binary or "opam", "--version" }, function(lines, err)
+    if not lines then
+      return cb(nil, err)
+    end
+    if #lines == 0 then
+      return cb(nil, "No version output")
+    end
+    local version = M.parse_version(lines[1])
+    if not version then
+      return cb(nil, "Cannot parse opam version: " .. lines[1])
+    end
+    cb(version, nil)
+  end)
 end
 
 --- Check if opam version supports --global flag (>= 2.1)
@@ -173,80 +168,74 @@ end
 
 --- Get opam variables using opam var command
 --- @param opam_binary string|nil The opam binary path (defaults to "opam")
---- @return ocaml.sandbox.opam.Variables|nil Variables or nil on error
---- @return string|nil error The error message if any
-function M.get_variables(opam_binary)
-  local version, err = M.get_version(opam_binary)
-  if not version then
-    return nil, err
-  end
+--- @param cb fun(vars: ocaml.sandbox.opam.Variables|nil, err: string|nil)
+function M.get_variables(opam_binary, cb)
+  M.get_version(opam_binary, function(version, err)
+    if not version then
+      return cb(nil, err)
+    end
 
-  local command = { opam_binary or "opam", "var" }
-  if M.supports_global_flag(version) then
-    table.insert(command, "--global")
-  end
+    local command = { opam_binary or "opam", "var" }
+    if M.supports_global_flag(version) then
+      table.insert(command, "--global")
+    end
 
-  local output = vim.fn.systemlist(command)
-
-  if vim.v.shell_error ~= 0 then
-    return nil, "Error executing opam var command"
-  end
-
-  return M.parse_variables(output), nil
+    Helpers.system_lines(command, function(lines, var_err)
+      if not lines then
+        return cb(nil, var_err)
+      end
+      cb(M.parse_variables(lines), nil)
+    end)
+  end)
 end
 
---- Get the local switch for a directory, if any
---- @param sandbox ocaml.sandbox.opam.Sandbox|nil The opam sandbox
+--- Find the local switch for a directory among a list of switches
+--- @param switches string[] Switch names, as listed by `opam switch list -s`
 --- @param dir string The directory to check
 --- @return string|nil The local switch name, or nil if none found
-function M.get_local_switch(sandbox, dir)
-  sandbox = sandbox or M.create_sandbox()
-  if not sandbox then
-    return nil
-  end
-  local switches = M.get_switches(sandbox)
-  if switches == nil then
-    return nil
-  end
-  -- then check for a local switch
+function M.find_local_switch(switches, dir)
   for _, switch in ipairs(switches) do
-    --- check if the switch is local and equals the given directory
     if M.is_local_switch(switch) and switch == dir then
       return switch
     end
   end
 end
 
+--- Get the local switch for a directory, if any
+--- @param sandbox ocaml.sandbox.opam.Sandbox The opam sandbox
+--- @param dir string The directory to check
+--- @param cb fun(switch: string|nil, err: string|nil)
+function M.get_local_switch(sandbox, dir, cb)
+  M.get_switches(sandbox, function(switches, err)
+    if not switches then
+      return cb(nil, err)
+    end
+    cb(M.find_local_switch(switches, dir), nil)
+  end)
+end
+
 --- Create an opam sandbox, detecting opam binary and root automatically
---- This mimics the VSCode OCaml Platform approach
---- @param opam_binary string|nil The opam binary path (defaults to detected opam)
+--- This mimics the VSCode OCaml Platform approach.
+--- `cb` is called synchronously when no detection is needed.
+--- @param opam_binary string|nil The opam binary path (defaults to "opam")
 --- @param opam_root string|nil The opam root directory (defaults to auto-detected root)
---- @return ocaml.sandbox.opam.Sandbox|nil The sandbox, or nil if opam is not available
-function M.create_sandbox(opam_binary, opam_root)
+--- @param cb fun(sandbox: ocaml.sandbox.opam.Sandbox|nil) nil when opam is not available
+function M.create_sandbox(opam_binary, opam_root, cb)
   local binary = opam_binary or "opam"
 
-  -- Check if opam binary is available
   if vim.fn.executable(binary) == 0 then
-    return nil
+    return cb(nil)
   end
 
-  local root = opam_root
-  if not root then
-    -- Try to detect opam root using opam var root command
-    local vars, _ = M.get_variables(opam_binary)
-
-    if vars and vars.root then
-      root = vars.root
-    else
-      -- Fallback to environment variable or default
-      root = vim.env.OPAMROOT or (vim.env.HOME .. "/.opam")
-    end
+  if opam_root then
+    return cb({ binary = binary, root = opam_root })
   end
 
-  return {
-    binary = binary,
-    root = root,
-  }
+  M.get_variables(binary, function(vars)
+    -- Fall back to the environment variable or the default location
+    local root = (vars and vars.root) or vim.env.OPAMROOT or vim.fs.joinpath(vim.env.HOME, ".opam")
+    cb({ binary = binary, root = root })
+  end)
 end
 
 --- Get the opam command to run in the sandbox

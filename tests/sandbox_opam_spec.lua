@@ -176,7 +176,38 @@ describe("ocaml.sandbox.opam", function()
     end)
   end)
 
+  describe("find_local_switch", function()
+    it("returns the local switch matching the directory", function()
+      local switches = { "4.14.0", "default", "/other/proj", "/proj" }
+      assert.are.equal("/proj", opam.find_local_switch(switches, "/proj"))
+    end)
+
+    it("ignores global switches with the same name", function()
+      assert.is_nil(opam.find_local_switch({ "proj", "4.14.0" }, "proj"))
+    end)
+
+    it("returns nil when nothing matches", function()
+      assert.is_nil(opam.find_local_switch({ "/a", "default" }, "/b"))
+    end)
+  end)
+
   describe("create_sandbox", function()
+    it("returns nil when opam is not executable", function()
+      local original_executable = vim.fn.executable
+      vim.fn.executable = function()
+        return 0
+      end
+
+      local called, sandbox = false, "unset"
+      opam.create_sandbox(nil, nil, function(sb)
+        called, sandbox = true, sb
+      end)
+      vim.fn.executable = original_executable
+
+      assert.is_true(called)
+      assert.is_nil(sandbox)
+    end)
+
     it("should use provided binary and root", function()
       -- Mock vim.fn.executable
       local original_executable = vim.fn.executable
@@ -187,7 +218,10 @@ describe("ocaml.sandbox.opam", function()
         return 0
       end
 
-      local sandbox = opam.create_sandbox("/custom/opam", "/custom/root")
+      local sandbox
+      opam.create_sandbox("/custom/opam", "/custom/root", function(sb)
+        sandbox = sb
+      end)
 
       assert.are.same({
         binary = "/custom/opam",
@@ -208,7 +242,10 @@ describe("ocaml.sandbox.opam", function()
         return 0
       end
 
-      local sandbox = opam.create_sandbox(nil, "/custom/root")
+      local sandbox
+      opam.create_sandbox(nil, "/custom/root", function(sb)
+        sandbox = sb
+      end)
       assert.are.equal("opam", sandbox.binary)
       assert.are.equal("/custom/root", sandbox.root)
 
