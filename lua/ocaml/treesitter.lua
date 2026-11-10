@@ -30,9 +30,9 @@ local PARSERS = {
   ocaml_mlx = {
     install_info = {
       location = "grammars/mlx",
-      url = "https://github.com/syaiful6/tree-sitter-mlx.git",
+      url = "https://github.com/ocaml-mlx/tree-sitter-mlx",
       files = { "src/parser.c", "src/scanner.c" },
-      branch = "update-grammar",
+      branch = "master",
     },
     filetype = "ocaml.mlx",
   },

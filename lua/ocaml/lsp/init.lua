@@ -103,18 +103,13 @@ end
 ---@field on_attach function
 ---@field on_exit function
 
----Start LSP client for the current buffer
----
----@param bufnr? number The buffer number (optional), default to the current buffer
-M.start = function(bufnr)
+---Find the project root for a buffer using OCaml-specific markers.
+---@param bufnr? number The buffer number, default to the current buffer
+---@return string root Normalized root; the buffer's directory if no marker is found
+---@return boolean found Whether a project marker was found
+M.find_root = function(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
   local bufname = vim.api.nvim_buf_get_name(bufnr)
-  local ocaml_config = vim.lsp.config[lsp_helpers.ocaml_client_name] or {}
-  local client_config = vim.tbl_deep_extend("force", ocaml_config, config.lsp or {}) --[[@as ocaml.lsp.ClientConfig]]
-  ---@class ocaml.lsp.StartConfig
-  local lsp_start_config = vim.tbl_deep_extend("force", {}, client_config)
-
-  -- Find project root using OCaml-specific patterns
   local root_dir = helpers.root_pattern(
     "dune-project",
     "dune-workspace",
@@ -125,7 +120,24 @@ M.start = function(bufnr)
     ".git"
   )(bufname)
 
-  if not root_dir then
+  if root_dir then
+    return vim.fs.normalize(root_dir), true
+  end
+  return vim.fs.normalize(vim.fs.dirname(bufname)), false
+end
+
+---Start LSP client for the current buffer
+---
+---@param bufnr? number The buffer number (optional), default to the current buffer
+M.start = function(bufnr)
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  local ocaml_config = vim.lsp.config[lsp_helpers.ocaml_client_name] or {}
+  local client_config = vim.tbl_deep_extend("force", ocaml_config, config.lsp or {}) --[[@as ocaml.lsp.ClientConfig]]
+  ---@class ocaml.lsp.StartConfig
+  local lsp_start_config = vim.tbl_deep_extend("force", {}, client_config)
+
+  local normalized_cwd, found = M.find_root(bufnr)
+  if not found then
     vim.notify(
       [[
 ocaml.nvim:
@@ -133,11 +145,7 @@ No project root found.
       ]],
       vim.log.levels.INFO
     )
-    root_dir = vim.fs.dirname(bufname)
   end
-
-  -- Normalize paths for consistent comparison
-  local normalized_cwd = vim.fs.normalize(root_dir)
   lsp_start_config.root_dir = normalized_cwd
 
   -- Configure LSP components using extracted functions
@@ -149,9 +157,10 @@ No project root found.
 
   lsp_start_config.name = lsp_helpers.ocaml_client_name
 
-  -- Reuse the project's client instead of resolving its sandbox again.
+  -- Reuse the project's client without resolving its sandbox again.
+  -- Ignore clients that are shutting down.
   for _, client in ipairs(lsp_helpers.get_active_lsp_clients()) do
-    if vim.fs.normalize(client.config.root_dir or "") == normalized_cwd then
+    if not client:is_stopped() and vim.fs.normalize(client.config.root_dir or "") == normalized_cwd then
       vim.lsp.buf_attach_client(bufnr, client.id)
       return
     end
@@ -203,20 +212,52 @@ M.stop = function(bufnr)
   local clients = lsp_helpers.get_active_lsp_clients(bufnr)
 
   for _, client in ipairs(clients) do
-    vim.lsp.stop_client(client.id)
+    client:stop()
   end
 end
 
----Restart LSP client for the current buffer
+---How long `restart` waits before force-stopping clients.
+local RESTART_TIMEOUT_MS = 5000
+local RESTART_POLL_MS = 50
+
+---Restart LSP client for the current buffer.
+---Detect the sandbox again and reattach every buffer from the old clients.
 ---@param bufnr? number The buffer number (optional), default to the current buffer
 M.restart = function(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
-  M.stop(bufnr)
+  require("ocaml.sandbox").invalidate(M.find_root(bufnr))
 
-  -- Small delay to ensure client is fully stopped
-  vim.defer_fn(function()
-    M.start(bufnr)
-  end, 100)
+  local clients = lsp_helpers.get_active_lsp_clients(bufnr)
+  local buffers = { [bufnr] = true }
+  for _, client in ipairs(clients) do
+    for buf in pairs(client.attached_buffers) do
+      buffers[buf] = true
+    end
+    client:stop()
+  end
+
+  -- Wait so `start` cannot reuse a client that is shutting down.
+  local elapsed = 0
+  local function start_when_stopped()
+    local alive = vim.tbl_filter(function(client)
+      return vim.lsp.get_client_by_id(client.id) ~= nil
+    end, clients)
+
+    if #alive > 0 and elapsed < RESTART_TIMEOUT_MS then
+      elapsed = elapsed + RESTART_POLL_MS
+      return vim.defer_fn(start_when_stopped, RESTART_POLL_MS)
+    end
+
+    for _, client in ipairs(alive) do
+      client:stop(true)
+    end
+    for buf in pairs(buffers) do
+      if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf) then
+        M.start(buf)
+      end
+    end
+  end
+  start_when_stopped()
 end
 
 ---Get LSP client status for the current buffer

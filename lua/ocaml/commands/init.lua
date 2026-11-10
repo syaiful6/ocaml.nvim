@@ -144,6 +144,19 @@ local lsp_subcmd_tbl = {
 register_subcommand_tbl("lsp", lsp_subcmd_tbl)
 
 ---@type table<string, ocaml.commands.Subcommand>
+local sandbox_subcmd_tbl = {
+  refresh = {
+    impl = function()
+      -- Clear cached sandboxes and restart this buffer's client.
+      require("ocaml.sandbox").invalidate()
+      require("ocaml.lsp").restart()
+    end,
+  },
+}
+
+register_subcommand_tbl("sandbox", sandbox_subcmd_tbl)
+
+---@type table<string, ocaml.commands.Subcommand>
 local dune_subcmd_tbl = {
   promote = {
     impl = function()

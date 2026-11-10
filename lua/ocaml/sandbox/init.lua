@@ -32,6 +32,8 @@
 ---@field wrap fun(sandbox: ocaml.sandbox.Sandbox, cmd: string[]): string[]|nil
 ---Extra environment variables needed to use the sandbox's toolchain.
 ---@field env? fun(sandbox: ocaml.sandbox.Sandbox): table<string, string>|nil
+---Drop any state the provider caches across project roots.
+---@field reset? fun()
 
 ---@class ocaml.Sandbox
 local M = {}
@@ -49,12 +51,11 @@ function M.get_provider(name)
   end
 end
 
----Resolve the sandbox to use for a project root.
----Providers are tried in priority order; the first candidate found is used.
----The "global" provider is last and always matches.
----@param root string The project root
+---Run providers in priority order and return the first candidate.
+---The "global" provider runs last and always matches.
+---@param root string
 ---@param cb fun(sandbox: ocaml.sandbox.Sandbox)
-function M.resolve(root, cb)
+local function detect(root, cb)
   local i = 0
   local function next_provider()
     i = i + 1
@@ -80,6 +81,71 @@ function M.resolve(root, cb)
     end)
   end
   next_provider()
+end
+
+---Resolved sandbox by project root.
+---@type table<string, ocaml.sandbox.Sandbox>
+local cache = {}
+
+---Callbacks waiting for detection, by project root.
+---@type table<string, fun(sandbox: ocaml.sandbox.Sandbox)[]>
+local pending = {}
+
+---Resolve the sandbox to use for a project root.
+---Cache the result until `invalidate` is called. Calls for the same root share
+---one detection. `cb` runs synchronously on a cache hit.
+---@param root string The project root
+---@param cb fun(sandbox: ocaml.sandbox.Sandbox)
+function M.resolve(root, cb)
+  if cache[root] then
+    return cb(cache[root])
+  end
+
+  if pending[root] then
+    table.insert(pending[root], cb)
+    return
+  end
+
+  local waiters = { cb }
+  pending[root] = waiters
+  detect(root, function(sandbox)
+    -- Do not cache a result invalidated while detection was running.
+    if pending[root] == waiters then
+      pending[root] = nil
+      cache[root] = sandbox
+    end
+    for _, waiter in ipairs(waiters) do
+      waiter(sandbox)
+    end
+  end)
+end
+
+---Return the cached sandbox for a root without running detection.
+---@param root string
+---@return ocaml.sandbox.Sandbox|nil
+function M.get_cached(root)
+  return cache[root]
+end
+
+---Clear the cached sandbox for `root`. Without `root`, clear all sandboxes and
+---provider caches. In-flight detections still call their waiters, but their
+---results are not cached.
+---@param root? string
+function M.invalidate(root)
+  if root then
+    cache[root] = nil
+    pending[root] = nil
+    return
+  end
+
+  cache = {}
+  pending = {}
+  for _, name in ipairs(priority) do
+    local provider = M.get_provider(name)
+    if provider and provider.reset then
+      provider.reset()
+    end
+  end
 end
 
 ---Wrap a command for the given sandbox.
