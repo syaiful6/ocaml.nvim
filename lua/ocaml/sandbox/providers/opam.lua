@@ -22,27 +22,29 @@ function M.detect(root, cb)
     return cb({})
   end
 
-  local opam = Opam.create_sandbox()
-  if not opam then
-    return cb({})
-  end
+  Opam.create_sandbox(nil, nil, function(opam)
+    if not opam then
+      return cb({})
+    end
 
-  -- Global and parent-directory switches are not detected yet.
-  local switch = Opam.get_local_switch(opam, root)
-  if not switch then
-    return cb({})
-  end
+    -- Global and parent-directory switches are not detected yet.
+    Opam.get_local_switch(opam, root, function(switch)
+      if not switch then
+        return cb({})
+      end
 
-  cb({
-    {
-      id = "opam:" .. switch,
-      provider = M.name,
-      label = "opam " .. vim.fn.fnamemodify(switch, ":~:.") .. " (local)",
-      root = root,
-      ---@type ocaml.sandbox.opam.Data
-      data = { binary = opam.binary, opam_root = opam.root, switch = switch },
-    },
-  })
+      cb({
+        {
+          id = "opam:" .. switch,
+          provider = M.name,
+          label = "opam " .. vim.fn.fnamemodify(switch, ":~:.") .. " (local)",
+          root = root,
+          ---@type ocaml.sandbox.opam.Data
+          data = { binary = opam.binary, opam_root = opam.root, switch = switch },
+        },
+      })
+    end)
+  end)
 end
 
 function M.wrap(sandbox, cmd)

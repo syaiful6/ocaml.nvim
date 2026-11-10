@@ -28,6 +28,7 @@ end
 ---Configure supported filetypes and language ID mapping
 ---@param lsp_config ocaml.lsp.StartConfig
 ---@return table
+---@return function get_language_id
 local function configure_filetypes(lsp_config)
   local filetypes = vim.deepcopy(lsp_config.filetypes or {})
 
@@ -110,8 +111,8 @@ M.start = function(bufnr)
   local bufname = vim.api.nvim_buf_get_name(bufnr)
   local ocaml_config = vim.lsp.config[lsp_helpers.ocaml_client_name] or {}
   local client_config = vim.tbl_deep_extend("force", ocaml_config, config.lsp or {}) --[[@as ocaml.lsp.ClientConfig]]
-  ---@type ocaml.lsp.StartConfig
-  local lsp_start_config = vim.tbl_deep_extend("force", {}, client_config) --[[@as ocaml.lsp.StartConfig]]
+  ---@class ocaml.lsp.StartConfig
+  local lsp_start_config = vim.tbl_deep_extend("force", {}, client_config)
 
   -- Find project root using OCaml-specific patterns
   local root_dir = helpers.root_pattern(
