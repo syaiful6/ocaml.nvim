@@ -65,24 +65,81 @@ function M.detect(root, cb)
       return cb({})
     end
 
-    -- Global and parent-directory switches are not detected yet.
-    Opam.get_local_switch(opam, root, function(switch)
-      if not switch then
+    Opam.get_switches(opam, function(switches)
+      if not switches then
         return cb({})
       end
 
-      cb({
-        {
-          id = "opam:" .. switch,
-          provider = M.name,
-          label = "opam " .. vim.fn.fnamemodify(switch, ":~:.") .. " (local)",
-          root = root,
-          ---@type ocaml.sandbox.opam.Data
-          data = { binary = opam.binary, opam_root = opam.root, switch = switch },
-        },
-      })
+      local locals = Opam.find_local_switches(switches, root)
+      if #locals > 0 then
+        return cb(M.build_candidates(opam, root, switches, locals, nil))
+      end
+
+      -- No local switch: ask opam which switch it would use here
+      -- (OPAMSWITCH or the globally selected one).
+      Opam.get_current_switch(opam, root, function(current)
+        cb(M.build_candidates(opam, root, switches, locals, current))
+      end)
     end)
   end)
+end
+
+---Whether `ocamllsp` is installed in a switch.
+---@param opam ocaml.sandbox.opam.Sandbox
+---@param switch string
+---@return boolean
+function M.has_ocamllsp(opam, switch)
+  local bin = vim.fs.joinpath(Opam.switch_prefix(opam, switch), "bin", "ocamllsp")
+  return vim.fn.executable(bin) == 1
+end
+
+---Order the switches available to `root`, with local switches first.
+---Local switches are always eligible for automatic selection. The current
+---global switch is eligible only when it contains `ocamllsp`; other global
+---switches remain available for manual selection. Switches local to unrelated
+---projects are excluded.
+---@param opam ocaml.sandbox.opam.Sandbox
+---@param root string
+---@param switches string[] All switches, from `opam switch list -s`
+---@param locals string[] Local switches applying to `root`, nearest first
+---@param current string|nil The switch opam selects in `root`, if known
+---@return ocaml.sandbox.Sandbox[]
+function M.build_candidates(opam, root, switches, locals, current)
+  local candidates = {}
+  local seen = {}
+
+  local function add(switch, auto)
+    if seen[switch] then
+      return
+    end
+    seen[switch] = true
+    local is_local = Opam.is_local_switch(switch)
+    local label = "opam "
+      .. (is_local and vim.fn.fnamemodify(switch, ":~") .. " (local)" or switch)
+      .. (switch == current and " (current)" or "")
+    table.insert(candidates, {
+      id = "opam:" .. switch,
+      provider = M.name,
+      label = label,
+      root = root,
+      auto = auto,
+      ---@type ocaml.sandbox.opam.Data
+      data = { binary = opam.binary, opam_root = opam.root, switch = switch },
+    })
+  end
+
+  for _, switch in ipairs(locals) do
+    add(switch, true)
+  end
+  if current then
+    add(current, M.has_ocamllsp(opam, current))
+  end
+  for _, switch in ipairs(switches) do
+    if not Opam.is_local_switch(switch) then
+      add(switch, false)
+    end
+  end
+  return candidates
 end
 
 function M.wrap(sandbox, cmd)

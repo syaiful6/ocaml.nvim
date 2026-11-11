@@ -21,12 +21,16 @@
 ---@field root string
 ---Provider-specific data. Only the owning provider should read it.
 ---@field data table
+---Whether resolution may pick this candidate automatically (default true).
+---Candidates with `auto = false` are only listed, e.g. for a picker.
+---@field auto? boolean
 
 ---@class ocaml.sandbox.Provider
 ---Unique provider name; also the prefix of the sandbox ids it produces.
 ---@field name string
----Detect candidate sandboxes for a project root. Call `cb` exactly once with
----an empty list when nothing is found. Detection may finish synchronously.
+---Detect candidate sandboxes for a project root, most preferred first. Call
+---`cb` exactly once, with an empty list when nothing is found. Detection may
+---finish synchronously.
 ---@field detect fun(root: string, cb: fun(candidates: ocaml.sandbox.Sandbox[]))
 ---Wrap `cmd` so it runs inside `sandbox`, or return nil if that is impossible.
 ---@field wrap fun(sandbox: ocaml.sandbox.Sandbox, cmd: string[]): string[]|nil
@@ -42,6 +46,17 @@ local M = {}
 ---@type string[]
 local priority = { "esy", "opam", "global" }
 
+---Return the first candidate that resolution may pick automatically.
+---@param candidates ocaml.sandbox.Sandbox[]
+---@return ocaml.sandbox.Sandbox|nil
+function M.first_auto(candidates)
+  for _, candidate in ipairs(candidates) do
+    if candidate.auto ~= false then
+      return candidate
+    end
+  end
+end
+
 ---@param name string
 ---@return ocaml.sandbox.Provider|nil
 function M.get_provider(name)
@@ -51,8 +66,8 @@ function M.get_provider(name)
   end
 end
 
----Run providers in priority order and return the first candidate.
----The "global" provider runs last and always matches.
+---Run providers in priority order and return the first automatic candidate.
+---The global provider runs last and provides the fallback.
 ---@param root string
 ---@param cb fun(sandbox: ocaml.sandbox.Sandbox)
 local function detect(root, cb)
@@ -61,7 +76,7 @@ local function detect(root, cb)
     i = i + 1
     local name = priority[i]
     if not name then
-      -- Keep a fallback in case the priority list is changed.
+      -- Preserve the global fallback if callers change the priority list.
       return M.get_provider("global").detect(root, function(candidates)
         cb(candidates[1])
       end)
@@ -73,8 +88,9 @@ local function detect(root, cb)
     end
 
     provider.detect(root, function(candidates)
-      if candidates[1] then
-        cb(candidates[1])
+      local chosen = M.first_auto(candidates)
+      if chosen then
+        cb(chosen)
       else
         next_provider()
       end
@@ -91,9 +107,9 @@ local cache = {}
 ---@type table<string, fun(sandbox: ocaml.sandbox.Sandbox)[]>
 local pending = {}
 
----Resolve the sandbox to use for a project root.
----Cache the result until `invalidate` is called. Calls for the same root share
----one detection. `cb` runs synchronously on a cache hit.
+---Resolve and cache the sandbox for a project root.
+---Concurrent calls for the same root share one detection. Cache hits invoke
+---the callback synchronously.
 ---@param root string The project root
 ---@param cb fun(sandbox: ocaml.sandbox.Sandbox)
 function M.resolve(root, cb)
@@ -127,9 +143,9 @@ function M.get_cached(root)
   return cache[root]
 end
 
----Clear the cached sandbox for `root`. Without `root`, clear all sandboxes and
----provider caches. In-flight detections still call their waiters, but their
----results are not cached.
+---Clear cached state for `root`, or clear all sandbox and provider caches.
+---In-flight detections still invoke their callbacks, but their results are not
+---cached.
 ---@param root? string
 function M.invalidate(root)
   if root then

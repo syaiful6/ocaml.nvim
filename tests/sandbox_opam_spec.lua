@@ -176,6 +176,29 @@ describe("ocaml.sandbox.opam", function()
     end)
   end)
 
+  describe("find_local_switches", function()
+    it("returns the root and parent switches, nearest first", function()
+      local switches = { "/a", "/a/b", "/a/b/c-other", "default", "/z" }
+      assert.are.same({ "/a/b", "/a" }, opam.find_local_switches(switches, "/a/b/c"))
+    end)
+
+    it("tolerates a trailing slash on the switch path", function()
+      assert.are.same({ "/a/" }, opam.find_local_switches({ "/a/" }, "/a/b"))
+    end)
+  end)
+
+  describe("switch_prefix", function()
+    local sb = { binary = "opam", root = "/home/u/.opam" }
+
+    it("uses <switch>/_opam for local switches", function()
+      assert.are.equal("/proj/_opam", opam.switch_prefix(sb, "/proj"))
+    end)
+
+    it("uses <root>/<name> for global switches", function()
+      assert.are.equal("/home/u/.opam/default", opam.switch_prefix(sb, "default"))
+    end)
+  end)
+
   describe("find_local_switch", function()
     it("returns the local switch matching the directory", function()
       local switches = { "4.14.0", "default", "/other/proj", "/proj" }
@@ -184,6 +207,10 @@ describe("ocaml.sandbox.opam", function()
 
     it("ignores global switches with the same name", function()
       assert.is_nil(opam.find_local_switch({ "proj", "4.14.0" }, "proj"))
+    end)
+
+    it("returns the nearest parent switch", function()
+      assert.are.equal("/proj", opam.find_local_switch({ "/", "/proj" }, "/proj/lib"))
     end)
 
     it("returns nil when nothing matches", function()
