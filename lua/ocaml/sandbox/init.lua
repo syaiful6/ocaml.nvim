@@ -265,6 +265,16 @@ function M.get_command(sandbox, cmd)
   return wrapped
 end
 
+---Extra environment variables the sandbox needs, if its provider has any.
+---@param sandbox ocaml.sandbox.Sandbox
+---@return table<string, string>|nil
+function M.get_env(sandbox)
+  local provider = M.get_provider(sandbox.provider)
+  if provider and provider.env then
+    return provider.env(sandbox)
+  end
+end
+
 ---Build the ocamllsp command for the given sandbox.
 ---@param sandbox ocaml.sandbox.Sandbox
 ---@param args? string[] Additional arguments for ocamllsp
