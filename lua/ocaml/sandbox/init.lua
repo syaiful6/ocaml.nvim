@@ -42,9 +42,21 @@
 ---@class ocaml.Sandbox
 local M = {}
 
----Provider priority. Resolution uses the first candidate found.
----@type string[]
-local priority = { "esy", "opam", "global" }
+---The sandbox section of the plugin configuration.
+---@return ocaml.sandbox.Config
+function M.config()
+  return require("ocaml.config.internal").sandbox
+end
+
+---Enabled providers in priority order, always ending with "global".
+---@return string[]
+function M.priority()
+  local names = vim.deepcopy(M.config().providers)
+  if not vim.tbl_contains(names, "global") then
+    table.insert(names, "global")
+  end
+  return names
+end
 
 ---Return the first candidate that resolution may pick automatically.
 ---@param candidates ocaml.sandbox.Sandbox[]
@@ -67,23 +79,22 @@ function M.get_provider(name)
 end
 
 ---Run providers in priority order and return the first automatic candidate.
----The global provider runs last and provides the fallback.
+---Stops at the first provider that has one; "global" always does.
 ---@param root string
 ---@param cb fun(sandbox: ocaml.sandbox.Sandbox)
-local function detect(root, cb)
+local function detect_first(root, cb)
+  local names = M.priority()
   local i = 0
   local function next_provider()
     i = i + 1
-    local name = priority[i]
+    local name = names[i]
+    local provider = name and M.get_provider(name)
     if not name then
-      -- Preserve the global fallback if callers change the priority list.
+      -- Unreachable while "global" ends the list; never leave cb uncalled.
       return M.get_provider("global").detect(root, function(candidates)
         cb(candidates[1])
       end)
-    end
-
-    local provider = M.get_provider(name)
-    if not provider then
+    elseif not provider then
       return next_provider()
     end
 
@@ -97,6 +108,79 @@ local function detect(root, cb)
     end)
   end
   next_provider()
+end
+
+---List every candidate sandbox for a project root, from every enabled
+---provider, in priority order. Unlike `resolve`, this always runs all
+---providers and is not cached.
+---@param root string
+---@param cb fun(candidates: ocaml.sandbox.Sandbox[])
+function M.list(root, cb)
+  local names = M.priority()
+  local all = {}
+  local i = 0
+  local function next_provider()
+    i = i + 1
+    local name = names[i]
+    if not name then
+      return cb(all)
+    end
+    local provider = M.get_provider(name)
+    if not provider then
+      return next_provider()
+    end
+    provider.detect(root, function(candidates)
+      vim.list_extend(all, candidates)
+      next_provider()
+    end)
+  end
+  next_provider()
+end
+
+---Apply the user's `resolve` hook to the candidates of a root.
+---@param hook fun(root: string, candidates: ocaml.sandbox.Sandbox[]): ocaml.sandbox.Sandbox|string|nil
+---@param root string
+---@param candidates ocaml.sandbox.Sandbox[]
+---@return ocaml.sandbox.Sandbox|nil chosen nil to keep the default choice
+local function apply_hook(hook, root, candidates)
+  local ok, choice = pcall(hook, root, vim.deepcopy(candidates))
+  if not ok then
+    vim.notify("[ocaml.nvim] sandbox.resolve failed: " .. tostring(choice), vim.log.levels.ERROR)
+    return nil
+  end
+  if choice == nil then
+    return nil
+  end
+
+  local id = type(choice) == "table" and choice.id or choice
+  for _, candidate in ipairs(candidates) do
+    if candidate.id == id then
+      return candidate
+    end
+  end
+  vim.notify(
+    ("[ocaml.nvim] sandbox.resolve returned %s, which is not a candidate for %s; using the default"):format(
+      vim.inspect(id),
+      root
+    ),
+    vim.log.levels.WARN
+  )
+end
+
+---Pick the sandbox for a root: the user's hook if it chooses one, otherwise
+---the first automatic candidate in priority order.
+---@param root string
+---@param cb fun(sandbox: ocaml.sandbox.Sandbox)
+local function detect(root, cb)
+  local hook = M.config().resolve
+  if not hook then
+    return detect_first(root, cb)
+  end
+
+  M.list(root, function(candidates)
+    -- "global" is always listed, so a default always exists.
+    cb(apply_hook(hook, root, candidates) or M.first_auto(candidates) or candidates[#candidates])
+  end)
 end
 
 ---Resolved sandbox by project root.
@@ -156,7 +240,7 @@ function M.invalidate(root)
 
   cache = {}
   pending = {}
-  for _, name in ipairs(priority) do
+  for _, name in ipairs(M.priority()) do
     local provider = M.get_provider(name)
     if provider and provider.reset then
       provider.reset()

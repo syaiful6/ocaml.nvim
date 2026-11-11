@@ -38,7 +38,8 @@ local function get_installation(cb)
 
   local waiters = { cb }
   installation_waiters = waiters
-  Opam.create_sandbox(nil, nil, function(opam)
+  local config = require("ocaml.config.internal").sandbox.opam
+  Opam.create_sandbox(config.binary, config.root, function(opam)
     -- Do not cache the result if reset() ran during lookup.
     if installation_waiters == waiters then
       installation_waiters = nil
@@ -56,7 +57,7 @@ function M.reset()
 end
 
 function M.detect(root, cb)
-  if vim.fn.executable("opam") == 0 then
+  if vim.fn.executable(require("ocaml.config.internal").sandbox.opam.binary) == 0 then
     return cb({})
   end
 

@@ -431,10 +431,241 @@ describe("ocaml.sandbox resolve with auto = false", function()
     require("ocaml.sandbox").resolve("/proj", function(sb)
       result = sb
     end)
-    for n, v in pairs(saved) do
-      package.loaded["ocaml.sandbox.providers." .. n] = v
+    -- Iterate the names: pairs() would skip providers that were not loaded (nil)
+    for _, n in ipairs({ "esy", "opam" }) do
+      package.loaded["ocaml.sandbox.providers." .. n] = saved[n]
     end
     package.loaded["ocaml.sandbox"] = nil
     assert.are.equal("global", result.id)
+  end)
+end)
+
+describe("ocaml.sandbox with configuration", function()
+  local sandbox, original_notify, notified
+  local detect_calls
+  local names = { "esy", "opam", "global" }
+  local saved = {}
+
+  ---@param sandbox_config table merged into the default sandbox config
+  local function configure(sandbox_config)
+    package.loaded["ocaml.config.internal"] = {
+      sandbox = vim.tbl_extend("force", {
+        providers = { "esy", "opam", "global" },
+        opam = { binary = "opam" },
+        esy = { binary = "esy" },
+      }, sandbox_config),
+    }
+    package.loaded["ocaml.sandbox"] = nil
+    sandbox = require("ocaml.sandbox")
+  end
+
+  local function stub(name, candidates)
+    package.loaded["ocaml.sandbox.providers." .. name] = {
+      name = name,
+      detect = function(root, cb)
+        detect_calls[name] = (detect_calls[name] or 0) + 1
+        cb(vim.tbl_map(function(c)
+          return vim.tbl_extend("force", { provider = name, label = c.id, root = root, data = {} }, c)
+        end, candidates))
+      end,
+      wrap = function(_, cmd)
+        return cmd
+      end,
+    }
+  end
+
+  local function resolve(root)
+    local result
+    sandbox.resolve(root or "/proj", function(sb)
+      result = sb
+    end)
+    return result
+  end
+
+  before_each(function()
+    for _, n in ipairs(names) do
+      saved[n] = package.loaded["ocaml.sandbox.providers." .. n]
+    end
+    saved.config = package.loaded["ocaml.config.internal"]
+    detect_calls = {}
+    notified = {}
+    original_notify = vim.notify
+    vim.notify = function(msg, level)
+      table.insert(notified, { msg = msg, level = level })
+    end
+    stub("esy", { { id = "esy:/proj/esy.json" } })
+    stub("opam", { { id = "opam:/proj" }, { id = "opam:4.14.2", auto = false } })
+    stub("global", { { id = "global" } })
+  end)
+
+  after_each(function()
+    vim.notify = original_notify
+    for _, n in ipairs(names) do
+      package.loaded["ocaml.sandbox.providers." .. n] = saved[n]
+    end
+    package.loaded["ocaml.config.internal"] = saved.config
+    package.loaded["ocaml.sandbox"] = nil
+  end)
+
+  it("always ends the priority with global", function()
+    configure({ providers = { "opam" } })
+    assert.are.same({ "opam", "global" }, sandbox.priority())
+    configure({ providers = { "global", "opam" } })
+    assert.are.same({ "global", "opam" }, sandbox.priority())
+  end)
+
+  it("follows the configured priority", function()
+    configure({ providers = { "opam", "esy" } })
+    assert.are.equal("opam:/proj", resolve().id)
+    assert.is_nil(detect_calls.esy)
+  end)
+
+  it("never runs providers left out of the list", function()
+    stub("opam", {})
+    configure({ providers = { "opam" } })
+    assert.are.equal("global", resolve().id)
+    assert.is_nil(detect_calls.esy)
+  end)
+
+  it("lists the candidates of every enabled provider in order", function()
+    configure({ providers = { "opam", "esy" } })
+    local ids
+    sandbox.list("/proj", function(c)
+      ids = vim.tbl_map(function(x)
+        return x.id
+      end, c)
+    end)
+    assert.are.same({ "opam:/proj", "opam:4.14.2", "esy:/proj/esy.json", "global" }, ids)
+  end)
+
+  describe("resolve hook", function()
+    it("can pick a candidate by id, including listed-only ones", function()
+      local seen
+      configure({
+        resolve = function(root, candidates)
+          seen = { root = root, n = #candidates }
+          return "opam:4.14.2"
+        end,
+      })
+      assert.are.equal("opam:4.14.2", resolve().id)
+      assert.are.same({ root = "/proj", n = 4 }, seen)
+    end)
+
+    it("can return the candidate itself", function()
+      configure({
+        resolve = function(_, candidates)
+          return candidates[#candidates]
+        end,
+      })
+      assert.are.equal("global", resolve().id)
+    end)
+
+    it("keeps the default choice when it returns nil", function()
+      configure({
+        resolve = function() end,
+      })
+      assert.are.equal("esy:/proj/esy.json", resolve().id)
+      assert.are.same({}, notified)
+    end)
+
+    it("warns and keeps the default for an unknown id", function()
+      configure({
+        resolve = function()
+          return "opam:5.9.9"
+        end,
+      })
+      assert.are.equal("esy:/proj/esy.json", resolve().id)
+      assert.are.equal(vim.log.levels.WARN, notified[1].level)
+    end)
+
+    it("reports an error in the hook and keeps the default", function()
+      configure({
+        resolve = function()
+          error("boom")
+        end,
+      })
+      assert.are.equal("esy:/proj/esy.json", resolve().id)
+      assert.are.equal(vim.log.levels.ERROR, notified[1].level)
+      assert.truthy(notified[1].msg:find("boom", 1, true))
+    end)
+
+    it("cannot mutate the cached candidates", function()
+      configure({
+        resolve = function(_, candidates)
+          candidates[1].id = "tampered"
+        end,
+      })
+      assert.are.equal("esy:/proj/esy.json", resolve().id)
+    end)
+
+    it("caches the hook's choice", function()
+      local calls = 0
+      configure({
+        resolve = function()
+          calls = calls + 1
+          return "global"
+        end,
+      })
+      resolve()
+      resolve()
+      assert.are.equal(1, calls)
+    end)
+  end)
+end)
+
+describe("configured binaries", function()
+  local saved_config
+
+  before_each(function()
+    saved_config = package.loaded["ocaml.config.internal"]
+  end)
+
+  after_each(function()
+    package.loaded["ocaml.config.internal"] = saved_config
+  end)
+
+  it("esy wraps with the binary recorded at detection", function()
+    local esy = require("ocaml.sandbox.providers.esy")
+    local manifest = vim.fn.tempname() .. ".json"
+    vim.fn.writefile({ "{}" }, manifest)
+    local out = esy.wrap({
+      id = "esy:" .. manifest,
+      provider = "esy",
+      label = "",
+      root = "/proj",
+      data = { manifest = manifest, binary = "/opt/esy" },
+    }, { "ocamllsp" })
+    vim.fn.delete(manifest)
+    assert.are.same({ "/opt/esy", "-P", manifest, "ocamllsp" }, out)
+  end)
+
+  it("opam passes the configured binary and root to create_sandbox", function()
+    local saved_lib = package.loaded["ocaml.sandbox.opam"]
+    local lib = vim.deepcopy(require("ocaml.sandbox.opam"))
+    local got
+    lib.create_sandbox = function(binary, root, cb)
+      got = { binary, root }
+      cb(nil)
+    end
+    package.loaded["ocaml.sandbox.opam"] = lib
+    package.loaded["ocaml.sandbox.providers.opam"] = nil
+    package.loaded["ocaml.config.internal"] = {
+      sandbox = { opam = { binary = "/opt/opam", root = "/srv/opam" } },
+    }
+    local original_executable = vim.fn.executable
+    vim.fn.executable = function(p)
+      return p == "/opt/opam" and 1 or 0
+    end
+
+    local result
+    require("ocaml.sandbox.providers.opam").detect("/proj", function(c)
+      result = c
+    end)
+
+    vim.fn.executable = original_executable
+    package.loaded["ocaml.sandbox.opam"] = saved_lib
+    package.loaded["ocaml.sandbox.providers.opam"] = nil
+    assert.are.same({ "/opt/opam", "/srv/opam" }, got)
+    assert.are.same({}, result)
   end)
 end)
