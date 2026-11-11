@@ -244,8 +244,8 @@ describe("ocaml.sandbox.providers.opam installation cache", function()
         cb({ binary = "opam", root = "/home/u/.opam" })
       end)
     end
-    opam_lib.get_local_switch = function(_, dir, cb)
-      cb(dir)
+    opam_lib.get_switches = function(_, cb)
+      cb({ "/a", "/b", "/c", "default" })
     end
     package.loaded["ocaml.sandbox.opam"] = opam_lib
     package.loaded["ocaml.sandbox.providers.opam"] = nil
@@ -296,5 +296,145 @@ describe("ocaml.sandbox.providers.opam installation cache", function()
     provider.reset()
     provider.detect("/a", function() end)
     assert.are.equal(2, creates)
+  end)
+end)
+
+describe("ocaml.sandbox.providers.opam switch selection", function()
+  local provider, saved_lib, original_executable
+  local switches, current, with_ocamllsp, current_calls
+
+  before_each(function()
+    saved_lib = package.loaded["ocaml.sandbox.opam"]
+    local opam_lib = vim.deepcopy(require("ocaml.sandbox.opam"))
+    switches, current, with_ocamllsp, current_calls = {}, nil, {}, 0
+    opam_lib.create_sandbox = function(_, _, cb)
+      cb({ binary = "opam", root = "/home/u/.opam" })
+    end
+    opam_lib.get_switches = function(_, cb)
+      cb(switches)
+    end
+    opam_lib.get_current_switch = function(_, _, cb)
+      current_calls = current_calls + 1
+      cb(current)
+    end
+    package.loaded["ocaml.sandbox.opam"] = opam_lib
+    package.loaded["ocaml.sandbox.providers.opam"] = nil
+    provider = require("ocaml.sandbox.providers.opam")
+
+    original_executable = vim.fn.executable
+    vim.fn.executable = function(path)
+      if path == "opam" then
+        return 1
+      end
+      return with_ocamllsp[path] and 1 or 0
+    end
+  end)
+
+  after_each(function()
+    vim.fn.executable = original_executable
+    package.loaded["ocaml.sandbox.opam"] = saved_lib
+    package.loaded["ocaml.sandbox.providers.opam"] = nil
+  end)
+
+  local function detect(root)
+    local result
+    provider.detect(root, function(c)
+      result = c
+    end)
+    return result
+  end
+
+  local function summary(candidates)
+    return vim.tbl_map(function(c)
+      return { c.data.switch, c.auto }
+    end, candidates)
+  end
+
+  it("prefers the local switch at the root and lists globals as manual", function()
+    switches = { "/work/other", "/work/proj", "4.14.2", "default" }
+    local c = detect("/work/proj")
+    assert.are.same({ { "/work/proj", true }, { "4.14.2", false }, { "default", false } }, summary(c))
+    assert.are.equal(0, current_calls)
+  end)
+
+  it("finds local switches in parent directories, nearest first", function()
+    switches = { "/work", "/work/mono", "/work/mono/pkg-other", "default" }
+    local c = detect("/work/mono/pkg")
+    assert.are.same({ { "/work/mono", true }, { "/work", true }, { "default", false } }, summary(c))
+  end)
+
+  it("does not treat a sibling with a common prefix as a parent", function()
+    switches = { "/work/proj", "default" }
+    current = "default"
+    local c = detect("/work/project")
+    assert.are.same({ { "default", false } }, summary(c))
+  end)
+
+  it("auto-selects the current global switch when it has ocamllsp", function()
+    switches = { "4.14.2", "default" }
+    current = "default"
+    with_ocamllsp["/home/u/.opam/default/bin/ocamllsp"] = true
+    local c = detect("/work/proj")
+    assert.are.same({ { "default", true }, { "4.14.2", false } }, summary(c))
+    assert.are.equal("opam default (current)", c[1].label)
+  end)
+
+  it("does not auto-select a current switch without ocamllsp", function()
+    switches = { "default" }
+    current = "default"
+    local c = detect("/work/proj")
+    assert.are.same({ { "default", false } }, summary(c))
+  end)
+
+  it("checks a local current switch for ocamllsp under _opam", function()
+    switches = { "/elsewhere", "default" }
+    current = "/elsewhere"
+    with_ocamllsp["/elsewhere/_opam/bin/ocamllsp"] = true
+    local c = detect("/work/proj")
+    assert.are.same({ { "/elsewhere", true }, { "default", false } }, summary(c))
+  end)
+
+  it("still lists globals when opam cannot report the current switch", function()
+    switches = { "default" }
+    current = nil
+    local c = detect("/work/proj")
+    assert.are.same({ { "default", false } }, summary(c))
+  end)
+end)
+
+describe("ocaml.sandbox resolve with auto = false", function()
+  it("skips listed-only candidates and falls through to the next provider", function()
+    local saved = {}
+    for _, n in ipairs({ "esy", "opam" }) do
+      saved[n] = package.loaded["ocaml.sandbox.providers." .. n]
+    end
+    package.loaded["ocaml.sandbox.providers.esy"] = {
+      name = "esy",
+      detect = function(_, cb)
+        cb({})
+      end,
+      wrap = function(_, c)
+        return c
+      end,
+    }
+    package.loaded["ocaml.sandbox.providers.opam"] = {
+      name = "opam",
+      detect = function(root, cb)
+        cb({ { id = "opam:default", provider = "opam", label = "", root = root, data = {}, auto = false } })
+      end,
+      wrap = function(_, c)
+        return c
+      end,
+    }
+    package.loaded["ocaml.sandbox"] = nil
+    local result
+    require("ocaml.sandbox").resolve("/proj", function(sb)
+      result = sb
+    end)
+    for n, v in pairs(saved) do
+      package.loaded["ocaml.sandbox.providers." .. n] = v
+    end
+    package.loaded["ocaml.sandbox"] = nil
+    assert.are.equal("global", result.id)
   end)
 end)
