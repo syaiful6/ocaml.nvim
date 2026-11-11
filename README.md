@@ -1,7 +1,11 @@
 # ocaml.nvim
 
-A comprehensive Neovim plugin for [OCaml](https://ocaml.org/) development with
-intelligent sandbox detection, LSP integration, and comprehensive filetype support.
+A Neovim plugin for [OCaml](https://ocaml.org/) with sandbox detection, LSP
+integration, and OCaml filetype support.
+
+When you open a supported OCaml file, the plugin starts `ocamllsp` inside the
+project's opam switch, esy sandbox or fallback to global environment. You can
+use the default detection or configure it for your project.
 
 ## Installation
 
@@ -20,7 +24,7 @@ intelligent sandbox detection, LSP integration, and comprehensive filetype suppo
   "ocaml/ocaml.nvim",
   dependencies = {
     "nvim-treesitter/nvim-treesitter",
-    -- Optional: for enhanced UI pickers (recommended)
+    -- Optional: fuzzy pickers with live search
     -- "ibhagwan/fzf-lua",  -- or
     -- "nvim-telescope/telescope.nvim",
   },
@@ -34,7 +38,7 @@ use {
   "ocaml/ocaml.nvim",
   requires = {
     "nvim-treesitter/nvim-treesitter",
-    -- Optional: for enhanced UI pickers (recommended)
+    -- Optional: fuzzy pickers with live search
     -- "ibhagwan/fzf-lua",  -- or
     -- "nvim-telescope/telescope.nvim",
   },
@@ -45,7 +49,7 @@ use {
 
 ```vim
 Plug 'nvim-treesitter/nvim-treesitter'
-" Optional: for enhanced UI pickers (recommended)
+" Optional: fuzzy pickers with live search
 " Plug 'ibhagwan/fzf-lua'  " or
 " Plug 'nvim-telescope/telescope.nvim'
 Plug 'ocaml/ocaml.nvim'
@@ -53,13 +57,14 @@ Plug 'ocaml/ocaml.nvim'
 
 ### Optional Dependencies
 
-- **fzf-lua** or **telescope.nvim**: Provides enhanced fuzzy pickers with live
-  search for commands like `:OCaml type-search`. Falls back to `vim.ui.select`
-  if neither is installed.
+Install **fzf-lua** or **telescope.nvim** for fuzzy pickers with live search in
+commands such as `:OCaml type-search`. Without either plugin, ocaml.nvim uses
+`vim.ui.select`.
 
-## 🔧 Configuration
+## Configuration
 
-The plugin works out of the box with sensible defaults. For advanced configuration:
+The default configuration works without setup. To override it, set
+`vim.g.ocamlnvim`:
 
 ```lua
 ---@type ocaml.Opts
@@ -107,9 +112,9 @@ vim.g.ocamlnvim = {
       binary = "esy",
     },
 
-    -- Pick the sandbox yourself. `candidates` holds every sandbox the enabled
-    -- providers found (e.g. all opam switches). Return one of them or its id,
-    -- or nil to keep the default choice.
+    -- Override sandbox selection. `candidates` contains every sandbox found by
+    -- the enabled providers, including all detected opam switches. Return a
+    -- candidate or its id, or nil to keep the default.
     resolve = function(root, candidates)
       if root:find("legacy%-app") then
         return "opam:4.14.2"
@@ -118,43 +123,6 @@ vim.g.ocamlnvim = {
   },
 }
 ```
-
-### Sandbox
-
-The plugin runs `ocamllsp` inside the project's sandbox (an opam switch or an
-esy project). Detection works out of the box; these options let you change it:
-
-```lua
-vim.g.ocamlnvim = {
-  sandbox = {
-    -- Sandbox kinds to try, in priority order. Leave one out to disable it.
-    -- "global" (tools from your PATH) is always the last resort.
-    providers = { "esy", "opam", "global" },
-
-    opam = {
-      binary = "opam",
-      root = nil, -- nil: detect with `opam var root`
-    },
-
-    esy = {
-      binary = "esy",
-    },
-
-    -- Pick the sandbox yourself. `candidates` holds every sandbox the enabled
-    -- providers found (e.g. all opam switches). Return one of them or its id,
-    -- or nil to keep the default choice.
-    resolve = function(root, candidates)
-      if root:find("legacy%-app") then
-        return "opam:4.14.2"
-      end
-    end,
-  },
-}
-```
-
-The detected sandbox is cached per project. Run `:OCaml lsp restart` (that
-project) or `:OCaml sandbox refresh` (every project) after creating or removing
-a switch.
 
 ## Troubleshooting
 
@@ -163,48 +131,45 @@ a switch.
 If you see errors like `"cannot start ocamllsp due to config error"` in your
 LSP logs:
 
-1. **Check for conflicts**: Make sure you've disabled `ocamllsp` in your LSP
-   configuration
-2. **LazyVim users**: Set `ocamllsp = false` in your server configuration
-3. **Check LSP logs**: `:lua print(vim.fn.stdpath("log") .. "/lsp.log")` to
-   find the log file
-4. **Debug configuration**: Run `:lua print(vim.inspect(vim.lsp.config))` to
-   check for incomplete configurations
+1. Disable `ocamllsp` in any other LSP configuration to avoid conflicts.
+2. In LazyVim, set `ocamllsp = false` in the server configuration.
+3. Find the LSP log with
+   `:lua print(vim.fn.stdpath("log") .. "/lsp.log")`.
+4. Inspect the active configuration with
+   `:lua print(vim.inspect(vim.lsp.config))`.
 
 ### Command Not Found Errors
 
 If the plugin can't find `ocamllsp` or other tools:
 
-1. **Esy projects**: Ensure dependencies are installed with `esy install`
-2. **Opam projects**: Make sure you're in the correct opam switch with tools
-   installed
-3. **Global installation**: Install `ocamllsp` globally via opam or your
-   package manager
+1. For esy projects, install dependencies with `esy install`.
+2. For opam projects, install the tools in the project's switch.
+3. For projects without a sandbox, install `ocamllsp` through opam or your
+   system package manager.
 
 ### Sandbox Detection Issues
 
 If the plugin doesn't detect your project type correctly:
 
-1. **Check project markers**: Ensure you have the appropriate files
-   (`dune-project`, `package.json`, etc.)
-2. **Manual LSP control**: Use `:OCaml lsp restart` to force re-detection
-3. **Debug sandbox**: Check what command is being used by looking at LSP logs
+1. Check that the project contains the expected marker files, such as
+   `dune-project` or `package.json`.
+2. Run `:OCaml lsp restart` to repeat detection.
+3. Check the LSP log to see which command the plugin ran.
 
 ## Contributing
 
-This plugin is in early development. Contributions are welcome!
+The plugin is in early development. Contributions are welcome.
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
+2. Create a feature branch: `git checkout -b feature/my-change`
 3. Run tests: `busted`
 4. Submit a pull request
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+Released under the MIT License. See [LICENSE](LICENSE).
 
 ## Acknowledgments
 
-- Inspired by [haskell-tools.nvim](https://github.com/mrcjkb/haskell-tools.nvim)
-  LSP architecture
-- Built for the OCaml community with ❤️
+- The LSP architecture draws from
+  [haskell-tools.nvim](https://github.com/mrcjkb/haskell-tools.nvim).
