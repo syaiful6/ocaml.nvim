@@ -9,6 +9,7 @@ local Esy = require("ocaml.sandbox.esy")
 
 ---@class ocaml.sandbox.esy.Data
 ---@field manifest string Path to the esy.json / package.json manifest
+---@field binary string The esy binary
 
 ---@class ocaml.sandbox.providers.Esy: ocaml.sandbox.Provider
 local M = {
@@ -28,7 +29,8 @@ local function has_esy_field(manifest)
 end
 
 function M.detect(root, cb)
-  if vim.fn.executable("esy") == 0 then
+  local binary = require("ocaml.config.internal").sandbox.esy.binary
+  if vim.fn.executable(binary) == 0 then
     return cb({})
   end
 
@@ -44,13 +46,13 @@ function M.detect(root, cb)
       label = "esy " .. vim.fn.fnamemodify(manifest, ":~:."),
       root = root,
       ---@type ocaml.sandbox.esy.Data
-      data = { manifest = manifest },
+      data = { manifest = manifest, binary = binary },
     },
   })
 end
 
 function M.wrap(sandbox, cmd)
-  return Esy.get_command(sandbox.data.manifest, cmd)
+  return Esy.get_command(sandbox.data.manifest, cmd, sandbox.data.binary)
 end
 
 return M

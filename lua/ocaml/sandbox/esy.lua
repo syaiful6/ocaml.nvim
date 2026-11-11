@@ -33,12 +33,13 @@ end
 -- Get the esy command to run in the sandbox
 -- @param manifest string The path to the manifest file
 -- @param args string[] Additional arguments to pass to esy
+-- @param binary? string The esy binary (defaults to "esy")
 -- @return string[]|nil The esy command, or nil if the manifest file is not readable
-function M.get_command(manifest, args)
+function M.get_command(manifest, args, binary)
   if not manifest or vim.fn.filereadable(manifest) == 0 then
     return nil
   end
-  local cmd = { "esy", "-P", manifest }
+  local cmd = { binary or "esy", "-P", manifest }
   for _, arg in ipairs(args or {}) do
     table.insert(cmd, arg)
   end
