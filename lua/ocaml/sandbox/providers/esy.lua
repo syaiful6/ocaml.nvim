@@ -45,6 +45,7 @@ function M.detect(root, cb)
       provider = M.name,
       label = "esy " .. vim.fn.fnamemodify(manifest, ":~:."),
       root = root,
+      note = "esy project",
       ---@type ocaml.sandbox.esy.Data
       data = { manifest = manifest, binary = binary },
     },

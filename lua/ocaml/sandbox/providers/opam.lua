@@ -120,7 +120,7 @@ function M.build_candidates(opam, root, switches, locals, current)
   local candidates = {}
   local seen = {}
 
-  local function add(switch, auto)
+  local function add(switch, auto, note)
     if seen[switch] then
       return
     end
@@ -135,16 +135,22 @@ function M.build_candidates(opam, root, switches, locals, current)
       label = label,
       root = root,
       auto = auto,
+      note = note,
       ---@type ocaml.sandbox.opam.Data
       data = { binary = opam.binary, opam_root = opam.root, switch = switch },
     })
   end
 
   for _, switch in ipairs(locals) do
-    add(switch, true)
+    local here = vim.fs.normalize(switch) == vim.fs.normalize(root)
+    add(switch, true, here and "local switch of this project" or "local switch in a parent directory")
   end
   if current then
-    add(current, M.has_ocamllsp(opam, current))
+    if M.has_ocamllsp(opam, current) then
+      add(current, true, "opam's current switch, with ocamllsp installed")
+    else
+      add(current, false, "opam's current switch, but ocamllsp is not installed in it")
+    end
   end
   for _, switch in ipairs(switches) do
     if not Opam.is_local_switch(switch) then

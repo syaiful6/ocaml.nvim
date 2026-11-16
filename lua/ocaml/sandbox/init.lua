@@ -24,6 +24,9 @@
 ---Whether resolution may pick this candidate automatically (default true).
 ---Candidates with `auto = false` are only listed, e.g. for a picker.
 ---@field auto? boolean
+---Short explanation of the candidate, shown by `:OCaml sandbox info`, e.g.
+---why it is or is not picked automatically.
+---@field note? string
 
 ---@class ocaml.sandbox.Provider
 ---Unique provider name; also the prefix of the sandbox ids it produces.
@@ -81,6 +84,11 @@ function M.get_provider(name)
     return provider
   end
 end
+
+---How a project's sandbox was chosen:
+---  "priority": the first automatic candidate in provider priority order.
+---  "hook":     the user's `sandbox.resolve` hook returned it.
+---@alias ocaml.sandbox.ChosenBy "priority"|"hook"
 
 ---Run providers in priority order and return the first automatic candidate.
 ---Stops at the first provider that has one; "global" always does.
@@ -174,22 +182,32 @@ end
 ---Pick the sandbox for a root: the user's hook if it chooses one, otherwise
 ---the first automatic candidate in priority order.
 ---@param root string
----@param cb fun(sandbox: ocaml.sandbox.Sandbox)
+---@param cb fun(sandbox: ocaml.sandbox.Sandbox, chosen_by: ocaml.sandbox.ChosenBy)
 local function detect(root, cb)
   local hook = M.config().resolve
   if not hook then
-    return detect_first(root, cb)
+    return detect_first(root, function(sandbox)
+      cb(sandbox, "priority")
+    end)
   end
 
   M.list(root, function(candidates)
+    local chosen = apply_hook(hook, root, candidates)
+    if chosen then
+      return cb(chosen, "hook")
+    end
     -- "global" is always listed, so a default always exists.
-    cb(apply_hook(hook, root, candidates) or M.first_auto(candidates) or candidates[#candidates])
+    cb(M.first_auto(candidates) or candidates[#candidates], "priority")
   end)
 end
 
 ---Resolved sandbox by project root.
 ---@type table<string, ocaml.sandbox.Sandbox>
 local cache = {}
+
+---How each cached sandbox was chosen, by project root.
+---@type table<string, ocaml.sandbox.ChosenBy>
+local chosen_by = {}
 
 ---Callbacks waiting for detection, by project root.
 ---@type table<string, fun(sandbox: ocaml.sandbox.Sandbox)[]>
@@ -212,11 +230,12 @@ function M.resolve(root, cb)
 
   local waiters = { cb }
   pending[root] = waiters
-  detect(root, function(sandbox)
+  detect(root, function(sandbox, how)
     -- Do not cache a result invalidated while detection was running.
     if pending[root] == waiters then
       pending[root] = nil
       cache[root] = sandbox
+      chosen_by[root] = how
     end
     for _, waiter in ipairs(waiters) do
       waiter(sandbox)
@@ -266,6 +285,13 @@ function M.get_cached(root)
   return cache[root]
 end
 
+---How the cached sandbox for a root was chosen, or nil when none is cached.
+---@param root string
+---@return ocaml.sandbox.ChosenBy|nil
+function M.get_chosen_by(root)
+  return chosen_by[root]
+end
+
 ---Clear cached state for `root`, or clear all sandbox and provider caches.
 ---In-flight detections still invoke their callbacks, but their results are not
 ---cached.
@@ -273,11 +299,13 @@ end
 function M.invalidate(root)
   if root then
     cache[root] = nil
+    chosen_by[root] = nil
     pending[root] = nil
     return
   end
 
   cache = {}
+  chosen_by = {}
   pending = {}
   for _, name in ipairs(M.priority()) do
     local provider = M.get_provider(name)
