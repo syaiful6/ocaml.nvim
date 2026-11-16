@@ -1,0 +1,4 @@
+{
+  "name": "esy-json",
+  "esy": { "build": "dune build" }
+}
