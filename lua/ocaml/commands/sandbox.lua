@@ -26,7 +26,7 @@ local M = {}
 
 ---@param cmd string[]
 ---@return string
-local function format_cmd(cmd)
+function M.format_cmd(cmd)
   return table.concat(
     vim.tbl_map(function(arg)
       return arg:find("[%s'\"]") and vim.fn.shellescape(arg) or arg
@@ -162,7 +162,7 @@ function M.format(report)
 
   if report.lsp_cmd then
     local status = report.lsp_client_id and (" (running, client %d)"):format(report.lsp_client_id) or " (not running)"
-    add({ ("  %-9s "):format("lsp"), "Comment" }, { format_cmd(report.lsp_cmd) }, { status, "Comment" })
+    add({ ("  %-9s "):format("lsp"), "Comment" }, { M.format_cmd(report.lsp_cmd) }, { status, "Comment" })
   else
     field("lsp", report.lsp_err or "no command", "ErrorMsg")
   end

@@ -175,6 +175,12 @@ end)
 
 ## Troubleshooting
 
+Start with `:checkhealth ocaml`. It checks your Neovim version and
+configuration, finds `opam`, `esy`, `dune` and `ocamllsp`, and checks the
+sandbox of the most recently used OCaml buffer: which sandbox is active and
+why, whether `ocamllsp` and `ocamlformat` are installed in it, and whether the
+language server is running.
+
 ### LSP Server Fails to Start
 
 If the LSP log contains `"cannot start ocamllsp due to config error"`:
