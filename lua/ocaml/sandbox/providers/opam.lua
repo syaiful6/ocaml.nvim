@@ -85,13 +85,24 @@ function M.detect(root, cb)
   end)
 end
 
+---Path of `name` in a switch's bin directory, if installed there.
+---@param opam ocaml.sandbox.opam.Sandbox
+---@param switch string
+---@param name string
+---@return string|nil
+local function switch_executable(opam, switch, name)
+  local bin = vim.fs.joinpath(Opam.switch_prefix(opam, switch), "bin", name)
+  if vim.fn.executable(bin) == 1 then
+    return bin
+  end
+end
+
 ---Whether `ocamllsp` is installed in a switch.
 ---@param opam ocaml.sandbox.opam.Sandbox
 ---@param switch string
 ---@return boolean
 function M.has_ocamllsp(opam, switch)
-  local bin = vim.fs.joinpath(Opam.switch_prefix(opam, switch), "bin", "ocamllsp")
-  return vim.fn.executable(bin) == 1
+  return switch_executable(opam, switch, "ocamllsp") ~= nil
 end
 
 ---Order the switches available to `root`, with local switches first.
@@ -141,6 +152,13 @@ function M.build_candidates(opam, root, switches, locals, current)
     end
   end
   return candidates
+end
+
+---Tools such as ocamlformat run directly from the switch's bin directory,
+---which avoids starting `opam exec` on every call.
+function M.find_executable(sandbox, name)
+  local data = sandbox.data
+  return switch_executable({ binary = data.binary, root = data.opam_root }, data.switch, name)
 end
 
 function M.wrap(sandbox, cmd)

@@ -60,6 +60,21 @@ Plug 'ocaml/ocaml.nvim'
 Install **fzf-lua** or **telescope.nvim** to add live fuzzy search to commands
 such as `:OCaml type-search`. Otherwise, ocaml.nvim uses `vim.ui.select`.
 
+With **conform.nvim**, the `ocamlformat` and `ocamlformat_mlx` formatters run
+from the project's opam switch or esy sandbox, so each project formats with
+its own ocamlformat version. When the switch does not have the formatter, the
+one on PATH is used. Your conform options for these formatters, such as
+`prepend_args`, still apply; set `command` to choose the executable yourself.
+
+```lua
+require("conform").setup({
+  formatters_by_ft = {
+    ocaml = { "ocamlformat" },
+    ["ocaml.mlx"] = { "ocamlformat_mlx" }
+  },
+})
+```
+
 ## Configuration
 
 No setup is required. Set `vim.g.ocamlnvim` to override the defaults:
