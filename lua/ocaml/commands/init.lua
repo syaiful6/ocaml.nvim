@@ -152,6 +152,11 @@ local sandbox_subcmd_tbl = {
       require("ocaml.lsp").restart()
     end,
   },
+  info = {
+    impl = function()
+      require("ocaml.commands.sandbox").info()
+    end,
+  },
 }
 
 register_subcommand_tbl("sandbox", sandbox_subcmd_tbl)

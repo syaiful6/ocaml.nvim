@@ -20,6 +20,7 @@ function M.detect(root, cb)
       provider = M.name,
       label = "global",
       root = root,
+      note = "no sandbox; tools run from PATH",
       data = {},
     },
   })

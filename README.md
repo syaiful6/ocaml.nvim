@@ -199,10 +199,13 @@ If the plugin cannot find `ocamllsp` or another tool:
 
 If the plugin detects the wrong project type:
 
-1. Check that the project contains the expected marker files, such as
+1. Run `:OCaml sandbox info` to see the active sandbox, the reason it was
+   selected, the `ocamllsp` command, and the other available candidates. You
+   can select an opam switch with `sandbox.resolve`.
+2. Check that the project contains the expected marker files, such as
    `dune-project` or `package.json`.
-2. Run `:OCaml lsp restart` to repeat detection.
-3. Check the LSP log to see which command the plugin ran.
+3. Run `:OCaml sandbox refresh` to repeat detection.
+4. Check the LSP log for errors from `ocamllsp`.
 
 ## Contributing
 

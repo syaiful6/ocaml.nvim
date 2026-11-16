@@ -66,7 +66,14 @@ describe("ocaml.sandbox", function()
       sandbox.resolve("/proj", function(sb)
         result = sb
       end)
-      assert.are.same({ id = "global", provider = "global", label = "global", root = "/proj", data = {} }, result)
+      assert.are.same({
+        id = "global",
+        provider = "global",
+        label = "global",
+        root = "/proj",
+        note = "no sandbox; tools run from PATH",
+        data = {},
+      }, result)
     end)
   end)
 
