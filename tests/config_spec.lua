@@ -86,6 +86,15 @@ describe("ocaml.config.internal", function()
       assert.truthy(notified[1].msg:find(case[2], 1, true), notified[1].msg)
       assert.are.same({ "esy", "opam", "global" }, config.sandbox.providers)
       assert.are.equal("opam", config.sandbox.opam.binary)
+      -- Kept for :checkhealth.
+      local err = require("ocaml.config.status").sandbox_error
+      assert.truthy(err and err:find(case[2], 1, true), err)
     end)
   end
+
+  it("clears the recorded error once the options are valid", function()
+    load({ sandbox = { providers = { "nix" } } })
+    load({ sandbox = { providers = { "opam" } } })
+    assert.is_nil(require("ocaml.config.status").sandbox_error)
+  end)
 end)

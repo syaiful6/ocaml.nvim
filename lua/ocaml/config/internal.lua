@@ -102,6 +102,7 @@ local function build(opts)
   end
 
   local err = validate_sandbox(config.sandbox)
+  require("ocaml.config.status").sandbox_error = err
   if err then
     -- Notify later: an error message raised while an ftplugin is being sourced
     -- becomes an exception that would abort loading the plugin.
