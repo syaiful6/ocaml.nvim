@@ -36,6 +36,10 @@
 ---@field wrap fun(sandbox: ocaml.sandbox.Sandbox, cmd: string[]): string[]|nil
 ---Extra environment variables needed to use the sandbox's toolchain.
 ---@field env? fun(sandbox: ocaml.sandbox.Sandbox): table<string, string>|nil
+---Path of an executable installed in the sandbox, or nil when it is not
+---installed there. Only for providers whose tools run without the sandbox's
+---environment; tools of other providers are run through `wrap`.
+---@field find_executable? fun(sandbox: ocaml.sandbox.Sandbox, name: string): string|nil
 ---Drop any state the provider caches across project roots.
 ---@field reset? fun()
 
@@ -220,6 +224,41 @@ function M.resolve(root, cb)
   end)
 end
 
+---Resolve the sandbox for a root, blocking until detection finishes.
+---Returns at once when the sandbox is cached. Must not be called from a
+---`vim.uv`/`vim.system` callback.
+---@param root string
+---@param timeout? integer Milliseconds to wait. Default: 10000.
+---@return ocaml.sandbox.Sandbox|nil
+---@return string|nil err
+function M.resolve_sync(root, timeout)
+  local result
+  M.resolve(root, function(sandbox)
+    result = sandbox
+  end)
+  if not result then
+    timeout = timeout or 10000
+    if not vim.wait(timeout, function()
+      return result ~= nil
+    end, 10) then
+      return nil, ("sandbox detection did not finish within %d ms"):format(timeout)
+    end
+  end
+  return result
+end
+
+---Project root of a buffer, found with the language server's root markers.
+---An unnamed buffer uses the working directory.
+---@param bufnr? integer Default: the current buffer.
+---@return string
+function M.buffer_root(bufnr)
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  if vim.api.nvim_buf_get_name(bufnr) == "" then
+    return vim.fs.normalize(vim.fn.getcwd())
+  end
+  return (require("ocaml.lsp").find_root(bufnr))
+end
+
 ---Return the cached sandbox for a root without running detection.
 ---@param root string
 ---@return ocaml.sandbox.Sandbox|nil
@@ -263,6 +302,24 @@ function M.get_command(sandbox, cmd)
     return nil, ("sandbox %s cannot run %s"):format(sandbox.id, table.concat(cmd, " "))
   end
   return wrapped
+end
+
+---Command running the tool `name` from the sandbox: the executable's path for
+---providers that can find it, otherwise `name` wrapped by the provider.
+---Returns nil when the provider can tell the tool is not installed.
+---@param sandbox ocaml.sandbox.Sandbox
+---@param name string e.g. "ocamlformat"
+---@return string[]|nil
+function M.get_tool_command(sandbox, name)
+  local provider = M.get_provider(sandbox.provider)
+  if not provider then
+    return nil
+  end
+  if provider.find_executable then
+    local path = provider.find_executable(sandbox, name)
+    return path and { path } or nil
+  end
+  return (M.get_command(sandbox, { name }))
 end
 
 ---Extra environment variables the sandbox needs, if its provider has any.

@@ -15,13 +15,7 @@ end
 local function setup_formatter()
   local Types = require("ocaml.types.internal")
   if Types.can_require("conform") then
-    local conform = require("conform")
-    conform.formatters.ocamlformat_mlx = {
-      inherit = false,
-      command = "ocamlformat-mlx",
-      args = { "--name", "$FILENAME", "--impl", "-" },
-      stdin = true,
-    }
+    require("ocaml.formatter").setup(require("conform"))
   end
 end
 

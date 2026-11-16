@@ -49,12 +49,7 @@ local function project_root(opts)
   if opts.root then
     return vim.fs.normalize(opts.root)
   end
-  local bufnr = opts.bufnr or vim.api.nvim_get_current_buf()
-  if vim.api.nvim_buf_get_name(bufnr) == "" then
-    -- Unnamed buffer: nothing to search from, use the working directory.
-    return vim.fs.normalize(vim.fn.getcwd())
-  end
-  return (require("ocaml.lsp").find_root(bufnr))
+  return require("ocaml.sandbox").buffer_root(opts.bufnr)
 end
 
 ---@param sandbox ocaml.sandbox.Sandbox
@@ -118,19 +113,16 @@ end
 ---@return string|nil err
 function M.get_command_sync(cmd, opts)
   opts = opts or {}
-  local done, result, err = false, nil, nil
-  M.get_command(cmd, opts, function(c, e)
-    done, result, err = true, c, e
-  end)
-  if not done then
-    local timeout = opts.timeout or 10000
-    if not vim.wait(timeout, function()
-      return done
-    end, 10) then
-      return nil, ("sandbox detection did not finish within %d ms"):format(timeout)
-    end
+  local err = check_cmd(cmd)
+  if err then
+    return nil, err
   end
-  return result, err
+  local Sandbox = require("ocaml.sandbox")
+  local sandbox, resolve_err = Sandbox.resolve_sync(project_root(opts), opts.timeout)
+  if not sandbox then
+    return nil, resolve_err
+  end
+  return Sandbox.get_command(sandbox, cmd)
 end
 
 ---@class ocaml.api.sandbox.RunOpts: ocaml.api.sandbox.Opts, vim.SystemOpts
