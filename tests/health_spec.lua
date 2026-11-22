@@ -72,7 +72,7 @@ describe("ocaml.health", function()
         return { "esy", "opam", "global" }
       end,
       config = function()
-        return { opam = { binary = "opam" }, esy = { binary = "esy" } }
+        return { opam = { binary = "opam" }, esy = { binary = "esy" }, dune = { binary = "dune" } }
       end,
       buffer_root = function()
         return "/proj"

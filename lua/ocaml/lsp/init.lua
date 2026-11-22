@@ -174,14 +174,14 @@ No project root found.
     end
   end
 
-  lsp_helpers.get_lsp_cmd(normalized_cwd, function(lsp_cmd, _, err)
+  lsp_helpers.get_lsp_cmd(normalized_cwd, function(lsp_cmd, sandbox, err)
     -- Sandbox detection may outlive the buffer.
     if not vim.api.nvim_buf_is_valid(bufnr) then
       return
     end
 
     if not lsp_cmd or #lsp_cmd == 0 then
-      vim.notify("[ocaml.nvim] Invalid LSP command: " .. (err or vim.inspect(lsp_cmd)), vim.log.levels.ERROR)
+      vim.notify("[ocaml.nvim] Cannot start ocamllsp: " .. (err or vim.inspect(lsp_cmd)), vim.log.levels.ERROR)
       return
     end
 
@@ -197,6 +197,11 @@ No project root found.
     end
 
     lsp_start_config.cmd = lsp_cmd
+    -- Add dune dev tool directories so ocamllsp finds the project's ocamlformat.
+    local env = require("ocaml.sandbox").get_env(sandbox)
+    if env then
+      lsp_start_config.cmd_env = vim.tbl_extend("force", lsp_start_config.cmd_env or {}, env)
+    end
 
     local client_id = vim.lsp.start(lsp_start_config, { bufnr = bufnr })
     if not client_id then

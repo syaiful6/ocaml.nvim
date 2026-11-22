@@ -30,7 +30,7 @@ local OcamlDefaultConfig = {
   sandbox = {
     ---Providers to use, in priority order. "global" is always the last resort.
     ---@type string[]
-    providers = { "esy", "opam", "global" },
+    providers = { "dune", "esy", "opam", "global" },
     ---@class ocaml.sandbox.opam.Config
     opam = {
       ---@type string
@@ -44,6 +44,13 @@ local OcamlDefaultConfig = {
       ---@type string
       binary = "esy",
     },
+    ---Projects using dune package management (a `dune.lock/` directory, or
+    ---`(pkg enabled)` in `dune-workspace`).
+    ---@class ocaml.sandbox.dune.Config
+    dune = {
+      ---@type string
+      binary = "dune",
+    },
     ---Pick the sandbox for a project yourself. Receives every candidate found
     ---by the enabled providers; return one of them (or its id), or nil to
     ---keep the default choice.
@@ -53,7 +60,7 @@ local OcamlDefaultConfig = {
 }
 
 ---Providers that can be listed in `sandbox.providers`.
-local KNOWN_PROVIDERS = { "esy", "opam", "global" }
+local KNOWN_PROVIDERS = { "dune", "esy", "opam", "global" }
 
 ---Validate the sandbox section of a merged config.
 ---@param sandbox table
@@ -66,6 +73,8 @@ local function validate_sandbox(sandbox)
     vim.validate("sandbox.opam.root", sandbox.opam.root, "string", true)
     vim.validate("sandbox.esy", sandbox.esy, "table")
     vim.validate("sandbox.esy.binary", sandbox.esy.binary, "string")
+    vim.validate("sandbox.dune", sandbox.dune, "table")
+    vim.validate("sandbox.dune.binary", sandbox.dune.binary, "string")
     vim.validate("sandbox.resolve", sandbox.resolve, "function", true)
   end)
   if not ok then

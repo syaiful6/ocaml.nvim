@@ -1,0 +1,10 @@
+(lang dune 3.20)
+
+; Configures a lock dir, but does not make the default context use it.
+(lock_dir
+ (path other.lock)
+ (repositories upstream))
+
+(context
+ (default
+  (lock_dir locks/dev.lock)))

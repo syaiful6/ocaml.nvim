@@ -17,6 +17,8 @@ local M = {}
 ---@field code? integer Default 0.
 ---@field stdout? string
 ---@field stderr? string
+---Side effect of the command, such as creating a file, run when it "exits".
+---@field effect? fun(cmd: string[], opts: table)
 
 ---@class tests.SystemCall
 ---@field cmd string[]
@@ -48,6 +50,9 @@ function M.install(responses)
     }
     -- The real vim.system calls on_exit later, from the event loop.
     vim.schedule(function()
+      if response.effect then
+        response.effect(cmd, opts or {})
+      end
       if on_exit then
         on_exit(result)
       end

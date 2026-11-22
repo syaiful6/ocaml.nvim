@@ -33,9 +33,10 @@ local M = {}
 ---@field root? string
 
 ---@class ocaml.api.sandbox.Info
----Stable identifier, e.g. "opam:/path/to/project", "opam:5.2.0", "global".
+---Stable identifier, e.g. "opam:/path/to/project", "opam:5.2.0",
+---"dune:/path/to/workspace", "global".
 ---@field id string
----Provider name: "opam", "esy" or "global".
+---Provider name: "dune", "opam", "esy" or "global".
 ---@field provider string
 ---Human readable description.
 ---@field label string

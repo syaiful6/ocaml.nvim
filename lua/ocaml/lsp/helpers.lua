@@ -44,14 +44,21 @@ M.buf_request = function(bufnr, method, params, handler)
 end
 
 --- Resolve the sandbox for a project root and build the OCaml LSP command.
+--- When the sandbox can install ocamllsp (dune dev tools), the user is
+--- offered to install it first.
 ---
 ---@param root_dir string The project root directory
 ---@param cb fun(cmd: string[]|nil, sandbox: ocaml.sandbox.Sandbox, err: string|nil)
 M.get_lsp_cmd = function(root_dir, cb)
   local sandbox = require("ocaml.sandbox")
   sandbox.resolve(root_dir, function(sb)
-    local cmd, err = sandbox.get_lsp_command(sb, {})
-    cb(cmd, sb, err)
+    sandbox.ensure_tool(sb, "ocamllsp", function(ok, ensure_err)
+      if not ok then
+        return cb(nil, sb, ensure_err)
+      end
+      local cmd, err = sandbox.get_lsp_command(sb, {})
+      cb(cmd, sb, err)
+    end)
   end)
 end
 
