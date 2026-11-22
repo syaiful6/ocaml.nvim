@@ -4,8 +4,9 @@
 ---Internal module. Its API may change without notice.
 ---
 ---Runs conform.nvim's `ocamlformat` and `ocamlformat_mlx` through the project
----sandbox. This uses the version installed in the project's opam switch or esy
----environment, falling back to PATH when the sandbox does not provide it.
+---sandbox. This uses the version installed in the project's opam switch, esy
+---environment or dune dev tools, falling back to PATH when the sandbox does
+---not provide it.
 ---
 ---ocaml.nvim only selects the command; other conform settings remain intact.
 ---Set `command` to a different executable, or set `format`, to disable sandbox
@@ -38,7 +39,12 @@ M.defaults = {
 function M.tool_command(bufnr, tool)
   local Sandbox = require("ocaml.sandbox")
   local sandbox = Sandbox.resolve_sync(Sandbox.buffer_root(bufnr))
-  return sandbox and Sandbox.get_tool_command(sandbox, tool) or { tool }
+  local cmd = sandbox and Sandbox.get_tool_command(sandbox, tool)
+  if sandbox and not cmd then
+    -- Use PATH for this run. The sandbox may install the tool for later runs.
+    Sandbox.ensure_tool(sandbox, tool, function() end)
+  end
+  return cmd or { tool }
 end
 
 ---Prepend arguments to conform args, preserving their original form.

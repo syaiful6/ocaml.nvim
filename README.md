@@ -3,16 +3,17 @@
 A Neovim plugin for [OCaml](https://ocaml.org/) that detects project sandboxes,
 configures `ocamllsp`, and supports OCaml filetypes.
 
-Open an OCaml file and the plugin starts `ocamllsp` in the project's opam switch
-or esy sandbox. If neither is available, it uses your global environment. The
-defaults should work for most projects, and sandbox detection is configurable.
+Open an OCaml file and the plugin starts `ocamllsp` in the project's dune, esy,
+or opam sandbox. If it cannot find one, it uses your global environment. You can
+change the detection order or disable individual providers.
 
 ## Installation
 
 ### Prerequisites
 
 - Neovim 0.11+
-- `ocamllsp` language server installed
+- `ocamllsp` language server installed, unless the project uses dune package
+  management and installs it as a dev tool
 - TreeSitter OCaml parsers
 
 ### Package Managers
@@ -60,11 +61,12 @@ Plug 'ocaml/ocaml.nvim'
 Install **fzf-lua** or **telescope.nvim** to add live fuzzy search to commands
 such as `:OCaml type-search`. Otherwise, ocaml.nvim uses `vim.ui.select`.
 
-With **conform.nvim**, the `ocamlformat` and `ocamlformat_mlx` formatters run
-from the project's opam switch or esy sandbox, so each project formats with
-its own ocamlformat version. When the switch does not have the formatter, the
-one on PATH is used. Your conform options for these formatters, such as
-`prepend_args`, still apply; set `command` to choose the executable yourself.
+With **conform.nvim**, the `ocamlformat` and `ocamlformat_mlx` formatters use
+the project's dune dev tools, opam switch, or esy sandbox. If the sandbox does
+not contain the formatter, ocaml.nvim uses the one on `PATH`. For dune package
+management projects, it also offers to run `dune tools install ocamlformat`.
+Conform options such as `prepend_args` still apply. Set `command` to choose the
+executable yourself.
 
 ```lua
 require("conform").setup({
@@ -114,7 +116,13 @@ vim.g.ocamlnvim = {
   sandbox = {
     -- Sandbox kinds to try, in priority order. Leave one out to disable it.
     -- "global" (tools from your PATH) is always the last resort.
-    providers = { "esy", "opam", "global" },
+    providers = { "dune", "esy", "opam", "global" },
+
+    -- Dune package management: projects with a lock dir (dune.lock/), or
+    -- `(pkg enabled)` in dune-workspace.
+    dune = {
+      binary = "dune",
+    },
 
     opam = {
       binary = "opam",
@@ -137,12 +145,41 @@ vim.g.ocamlnvim = {
 }
 ```
 
+## Dune Package Management
+
+Projects that use [dune package management](https://dune.readthedocs.io/en/stable/tutorials/dune-package-management/index.html)
+do not need opam or esy. The `dune` provider selects a project when its
+workspace has a lock directory (`dune.lock/`, or the default context's
+`lock_dir` in `dune-workspace`) or when `dune-workspace` contains `(pkg
+enabled)`. `(pkg disabled)` turns the provider off for that workspace. Dune is
+first in the default provider order because a lock directory explicitly ties
+the project to dune package management.
+
+The plugin manages `ocamllsp` and `ocamlformat` as dune dev tools built against
+the project's lock directory:
+
+- When `ocamllsp` is missing, the plugin asks once whether to run
+  `dune tools install ocamllsp`. The first installation builds it from source
+  and may take a few minutes. The language server starts afterward.
+- When package management is enabled without a lock directory, the plugin asks
+  whether to run `dune pkg lock` first.
+- When the lock directory changes while `ocamllsp` runs, the plugin asks
+  whether to rebuild the dev tools and restart the server.
+
+Dev tools run from the directories reported by `dune tools env`, which the
+plugin places first on `PATH`. This lets `ocamllsp` find the project's
+`ocamlformat` even while `dune build --watch` holds dune's build lock. The
+plugin remembers prompt responses for the session; `:OCaml sandbox refresh`
+clears them. The provider requires a dune version that supports `dune tools
+env`. With an older version, `:OCaml sandbox info` lists the project but the
+plugin does not select it.
+
 ## Lua API
 
-`require("ocaml").sandbox` runs commands in the same opam switch or esy sandbox
-as the language server. This keeps tools such as `dune` and `ocamlformat` on the
-project's installed versions. Pass `opts.root` to select a project directly, or
-`opts.bufnr` to derive it from a buffer. The current buffer is the default.
+`require("ocaml").sandbox` runs commands in the language server's dune, opam,
+or esy sandbox, so commands use the project's versions of `dune` and
+`ocamlformat`. Pass `opts.root` to select a project directly or `opts.bufnr` to
+derive it from a buffer. The current buffer is the default.
 
 ```lua
 local sandbox = require("ocaml").sandbox
@@ -176,10 +213,10 @@ end)
 ## Troubleshooting
 
 Start with `:checkhealth ocaml`. It checks your Neovim version and
-configuration, finds `opam`, `esy`, `dune` and `ocamllsp`, and checks the
-sandbox of the most recently used OCaml buffer: which sandbox is active and
-why, whether `ocamllsp` and `ocamlformat` are installed in it, and whether the
-language server is running.
+configuration, locates `opam`, `esy`, `dune`, and `ocamllsp`, then reports the
+sandbox for the most recently used OCaml buffer. The report explains why the
+sandbox was selected, whether it contains `ocamllsp` and `ocamlformat`, and
+whether the language server is running.
 
 ### LSP Server Fails to Start
 
@@ -196,9 +233,11 @@ If the LSP log contains `"cannot start ocamllsp due to config error"`:
 
 If the plugin cannot find `ocamllsp` or another tool:
 
-1. For esy projects, install dependencies with `esy install`.
-2. For opam projects, install the tools in the project's switch.
-3. For projects without a sandbox, install `ocamllsp` through opam or your
+1. For dune package management projects, run `dune tools install ocamllsp`
+   (and `ocamlformat`) in the project, then `:OCaml lsp restart`.
+2. For esy projects, install dependencies with `esy install`.
+3. For opam projects, install the tools in the project's switch.
+4. For projects without a sandbox, install `ocamllsp` through opam or your
    system package manager.
 
 ### Sandbox Detection Issues
@@ -209,7 +248,9 @@ If the plugin detects the wrong project type:
    selected, the `ocamllsp` command, and the other available candidates. You
    can select an opam switch with `sandbox.resolve`.
 2. Check that the project contains the expected marker files, such as
-   `dune-project` or `package.json`.
+   `dune-project`, `dune.lock/`, or `package.json`. To stop a project with a
+   lock directory from using dune package management, add `(pkg disabled)` to
+   its `dune-workspace` or remove `"dune"` from `sandbox.providers`.
 3. Run `:OCaml sandbox refresh` to repeat detection.
 4. Check the LSP log for errors from `ocamllsp`.
 

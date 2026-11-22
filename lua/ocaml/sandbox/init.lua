@@ -11,7 +11,8 @@
 ---@brief ]]
 
 ---@class ocaml.sandbox.Sandbox
----Stable, serializable identifier, such as "opam:/path/to/proj", "esy:/path/esy.json", or "global".
+---Stable, serializable identifier, such as "opam:/path/to/proj", "esy:/path/esy.json",
+---"dune:/path/to/workspace", or "global".
 ---@field id string
 ---Name of the provider that detected this sandbox.
 ---@field provider string
@@ -43,6 +44,10 @@
 ---installed there. Only for providers whose tools run without the sandbox's
 ---environment; tools of other providers are run through `wrap`.
 ---@field find_executable? fun(sandbox: ocaml.sandbox.Sandbox, name: string): string|nil
+---Make the tool `name` usable in `sandbox`, e.g. by offering to install it.
+---Call `cb` exactly once: `true` when the tool can run, otherwise `false` and
+---a message saying why. Providers without it assume their tools are present.
+---@field ensure_tool? fun(sandbox: ocaml.sandbox.Sandbox, name: string, cb: fun(ok: boolean, err: string|nil))
 ---Drop any state the provider caches across project roots.
 ---@field reset? fun()
 
@@ -358,6 +363,19 @@ function M.get_env(sandbox)
   if provider and provider.env then
     return provider.env(sandbox)
   end
+end
+
+---Make the tool `name` usable in `sandbox` when its provider knows how (e.g.
+---offer `dune tools install`); otherwise report success right away.
+---@param sandbox ocaml.sandbox.Sandbox
+---@param name string
+---@param cb fun(ok: boolean, err: string|nil)
+function M.ensure_tool(sandbox, name, cb)
+  local provider = M.get_provider(sandbox.provider)
+  if provider and provider.ensure_tool then
+    return provider.ensure_tool(sandbox, name, cb)
+  end
+  cb(true)
 end
 
 ---Build the ocamllsp command for the given sandbox.

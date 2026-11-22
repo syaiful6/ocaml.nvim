@@ -145,7 +145,16 @@ local function check_executables()
     end
   end
 
-  check_executable("dune", "dune", info, "Fine when your sandbox provides it.")
+  check_executable(
+    "dune",
+    config.dune.binary,
+    info,
+    "Fine when your sandbox provides it, but dune package management projects will not be detected.",
+    { "Install dune, or set sandbox.dune.binary" }
+  )
+  if not vim.tbl_contains(enabled, "dune") then
+    h.info("dune: package management provider disabled in sandbox.providers")
+  end
   check_executable(
     "ocamllsp",
     "ocamllsp",
@@ -157,10 +166,15 @@ end
 
 ---Advice for installing a tool in a sandbox.
 ---@param sandbox ocaml.sandbox.Sandbox
+---@param tool string executable name
 ---@param package string opam package name
 ---@return string[]
-local function install_advice(sandbox, package)
-  if sandbox.provider == "opam" then
+local function install_advice(sandbox, tool, package)
+  if sandbox.provider == "dune" then
+    return {
+      ("Run `dune tools install %s` in %s"):format(tool, vim.fn.fnamemodify(sandbox.data.workspace, ":~")),
+    }
+  elseif sandbox.provider == "opam" then
     return { ("Run `opam install %s --switch=%s`"):format(package, sandbox.data.switch) }
   elseif sandbox.provider == "esy" then
     return { ("Add `%s` to the esy manifest's devDependencies and run `esy install`"):format(package) }
@@ -176,10 +190,10 @@ end
 local function check_tool(sandbox, tool, package, missing)
   local cmd = require("ocaml.sandbox").get_tool_command(sandbox, tool)
   if not cmd then
-    return missing(("%s is not installed in %s"):format(tool, sandbox.label), install_advice(sandbox, package))
+    return missing(("%s is not installed in %s"):format(tool, sandbox.label), install_advice(sandbox, tool, package))
   end
   if vim.fn.executable(cmd[1]) == 0 then
-    return missing(("%s: `%s` is not executable"):format(tool, cmd[1]), install_advice(sandbox, package))
+    return missing(("%s: `%s` is not executable"):format(tool, cmd[1]), install_advice(sandbox, tool, package))
   end
   local path = vim.fn.exepath(cmd[1])
   local resolved = (path ~= "" and path ~= cmd[1]) and (" (%s)"):format(path) or ""

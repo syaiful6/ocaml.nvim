@@ -28,10 +28,11 @@ describe("ocaml.config.internal", function()
 
   it("provides sandbox defaults", function()
     local config = load(nil)
-    assert.are.same({ "esy", "opam", "global" }, config.sandbox.providers)
+    assert.are.same({ "dune", "esy", "opam", "global" }, config.sandbox.providers)
     assert.are.equal("opam", config.sandbox.opam.binary)
     assert.is_nil(config.sandbox.opam.root)
     assert.are.equal("esy", config.sandbox.esy.binary)
+    assert.are.equal("dune", config.sandbox.dune.binary)
     assert.is_nil(config.sandbox.resolve)
     assert.are.same({}, notified)
   end)
@@ -45,7 +46,7 @@ describe("ocaml.config.internal", function()
     local config = load({ sandbox = { opam = { root = "/srv/opam" } } })
     assert.are.equal("/srv/opam", config.sandbox.opam.root)
     assert.are.equal("opam", config.sandbox.opam.binary)
-    assert.are.same({ "esy", "opam", "global" }, config.sandbox.providers)
+    assert.are.same({ "dune", "esy", "opam", "global" }, config.sandbox.providers)
   end)
 
   it("accepts options given as a function", function()
@@ -74,6 +75,7 @@ describe("ocaml.config.internal", function()
     ["an unknown provider"] = { { providers = { "opam", "nix" } }, "unknown provider" },
     ["a duplicate provider"] = { { providers = { "opam", "opam" } }, "listed twice" },
     ["a non-string binary"] = { { opam = { binary = 42 } }, "sandbox.opam.binary" },
+    ["a non-string dune binary"] = { { dune = { binary = false } }, "sandbox.dune.binary" },
     ["a non-function resolve"] = { { resolve = "opam:default" }, "sandbox.resolve" },
   }
   for name, case in pairs(invalid) do
@@ -84,7 +86,7 @@ describe("ocaml.config.internal", function()
       assert.are.equal(1, #notified)
       assert.are.equal(vim.log.levels.ERROR, notified[1].level)
       assert.truthy(notified[1].msg:find(case[2], 1, true), notified[1].msg)
-      assert.are.same({ "esy", "opam", "global" }, config.sandbox.providers)
+      assert.are.same({ "dune", "esy", "opam", "global" }, config.sandbox.providers)
       assert.are.equal("opam", config.sandbox.opam.binary)
       -- Kept for :checkhealth.
       local err = require("ocaml.config.status").sandbox_error
